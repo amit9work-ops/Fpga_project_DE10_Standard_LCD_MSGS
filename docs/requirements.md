@@ -8,7 +8,7 @@ This document defines simulation-first requirements that must pass before FPGA b
 R1. Buttons shall be debounced in FPGA fabric.
 - Input polarity: KEY signals are active-LOW.
 - Output polarity: debounced outputs are active-HIGH.
-- Default debounce window: 50 ms at 50 MHz.
+- Default debounce window: 20 ms at 50 MHz (1,000,000 cycles).
 
 R2. A button press shall generate exactly one pulse event per rising edge of debounced state.
 - Holding a button shall not generate repeated pulses.
@@ -68,3 +68,9 @@ A2. Pulse width checks must confirm all event ticks/pulses are single-cycle wher
 A3. All HEX checks must compare exact segment patterns, not only non-blank checks.
 
 A4. Requirements-to-tests traceability shall be documented in verification_report.md.
+
+## Performance Notes (Pre-Board)
+
+- HPS polling interval target: 5 ms.
+- Expected end-to-end button-to-LCD latency: approximately 35 ms.
+- Current FPGA resource usage target: 7% ALMs.

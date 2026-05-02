@@ -249,6 +249,15 @@ module tb_fpga_msg_controller;
         key_in[1] = 1'b1;
         repeat (1010) @(posedge clk);
 
+        // Timer should reset on any button pulse, even during MSG
+        repeat (CLK_FREQ_HZ/4) @(posedge clk); // keep well under timeout
+        key_in[1] = 1'b0;  // Press KEY1 again to reset timer in MSG
+        repeat (1010) @(posedge clk);
+        check_bool(timeout_flag == 1'b0, 1'b1, "Timer cleared by KEY1 in MSG");
+        check_bool(seconds_remaining >= 4'd2, 1'b1, "Timer reloaded by KEY1 in MSG");
+        key_in[1] = 1'b1;
+        repeat (1010) @(posedge clk);
+
         repeat (3*CLK_FREQ_HZ + 20) @(posedge clk); // timeout in MSG -> SLEEP
         check_bool(fsm_state == S_SLEEP, 1'b1, "FSM MSG->SLEEP on timeout");
 

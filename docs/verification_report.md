@@ -49,9 +49,9 @@ This report maps requirements to simulations and records expected evidence for s
 
 | Item | Source Artifact | Status | Notes |
 |---|---|---|---|
-| Debounce window correctness | hw/rtl/button_debouncer.v + hw/sim/testbenches/tb_button_debouncer.v | Closed (simulation) | Parameterized 50 ms behavior validated in unit simulation. |
+| Debounce window correctness | hw/rtl/button_debouncer.v + hw/sim/testbenches/tb_button_debouncer.v | Closed (simulation) | Parameterized 20 ms behavior validated in unit simulation. |
 | Timer countdown correctness | hw/rtl/idle_timer.v + hw/sim/testbenches/tb_idle_timer.v | Closed (simulation) | Deterministic clock-driven countdown behavior validated. |
 | FSM transition correctness | hw/rtl/message_fsm.v + hw/sim/testbenches/tb_message_fsm.v | Closed (simulation) | Directed and deep transition coverage present. |
 | Register contract stability | hw/sim/testbenches/tb_soc_register_contract.v | Closed (simulation) | Packing for FSM/timer status verified. |
-| FPGA utilization budget | hw/quartus/output_files/DE10_Standard_GHRD.fit.rpt | Closed (report) | Utilization evidence available in fitter report artifact. |
-| End-to-end button-to-LCD latency target | Board measurement artifact (scope/logic analyzer) | Open | Requires hardware capture and threshold comparison for final presentation sign-off. |
+| FPGA utilization budget | hw/quartus/output_files/DE10_Standard_GHRD.fit.rpt | Closed (report) | Utilization evidence available in fitter report artifact (7% ALMs). |
+| End-to-end button-to-LCD latency target | Board measurement artifact (scope/logic analyzer) | Open | Expected latency ~35 ms with 20 ms debounce + 5 ms polling; requires hardware capture. |

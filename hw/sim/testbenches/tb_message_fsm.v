@@ -69,6 +69,16 @@ module tb_message_fsm;
         end
     endtask
 
+    task pulse_vec;
+        input [3:0] vec;
+        begin
+            btn_pulse = vec;
+            @(posedge clk);
+            btn_pulse = 4'b0000;
+            @(posedge clk);
+        end
+    endtask
+
     task model_step;
         input  [2:0] in_state;
         input  [INDEX_W-1:0] in_index;
@@ -223,6 +233,131 @@ module tb_message_fsm;
         btn_pulse = 4'b0000;
         @(posedge clk);
         check_eq(state == S_SLEEP, "Timeout has priority in HOME");
+
+        // ============================================================
+        // KEY3 no-op behavior in HOME and MSG
+        // ============================================================
+        pulse_btn(2); // wake to IDLE
+        pulse_btn(1); // IDLE->HOME
+        check_eq(state == S_HOME, "HOME entered for KEY3 no-op test");
+        exp_index = msg_index;
+        pulse_vec(4'b1000); // KEY3 only
+        check_eq(state == S_HOME, "HOME stays on KEY3 no-op");
+        check_eq(msg_index == exp_index, "HOME index unchanged on KEY3");
+
+        pulse_btn(1); // HOME->MSG
+        check_eq(state == S_MSG, "MSG entered for KEY3 no-op test");
+        pulse_btn(1); // increment to 1
+        exp_index = msg_index;
+        pulse_vec(4'b1000); // KEY3 only
+        check_eq(state == S_MSG, "MSG stays on KEY3 no-op");
+        check_eq(msg_index == exp_index, "MSG index unchanged on KEY3");
+
+        // ============================================================
+        // SLEEP wake on KEY3
+        // ============================================================
+        timeout_flag = 1'b1;
+        @(posedge clk);
+        timeout_flag = 1'b0;
+        @(posedge clk);
+        check_eq(state == S_SLEEP, "Enter SLEEP for KEY3 wake test");
+        pulse_vec(4'b1000);
+        check_eq(state == S_IDLE, "SLEEP -> IDLE on KEY3 wake");
+
+        // SLEEP wake on KEY0 and KEY1
+        pulse_btn(1); // IDLE->HOME
+        timeout_flag = 1'b1;
+        @(posedge clk);
+        timeout_flag = 1'b0;
+        @(posedge clk);
+        check_eq(state == S_SLEEP, "Enter SLEEP for KEY0 wake test");
+        pulse_vec(4'b0001);
+        check_eq(state == S_IDLE, "SLEEP -> IDLE on KEY0 wake");
+
+        pulse_btn(1); // IDLE->HOME
+        timeout_flag = 1'b1;
+        @(posedge clk);
+        timeout_flag = 1'b0;
+        @(posedge clk);
+        check_eq(state == S_SLEEP, "Enter SLEEP for KEY1 wake test");
+        pulse_vec(4'b0010);
+        check_eq(state == S_IDLE, "SLEEP -> IDLE on KEY1 wake");
+
+        // ============================================================
+        // Multi-key priority in HOME
+        // ============================================================
+        pulse_btn(1); // IDLE->HOME
+        check_eq(state == S_HOME, "HOME entered for multi-key test");
+        pulse_vec(4'b0011); // KEY0+KEY1
+        check_eq(state == S_IDLE, "HOME: KEY0+KEY1 -> IDLE (KEY0 priority)");
+
+        pulse_btn(1); // IDLE->HOME
+        pulse_vec(4'b0110); // KEY1+KEY2
+        check_eq(state == S_MSG, "HOME: KEY1+KEY2 -> MSG");
+        check_eq(msg_index == 0, "HOME: KEY1+KEY2 resets index");
+        pulse_btn(0); // MSG->HOME
+        pulse_vec(4'b0101); // KEY0+KEY2
+        check_eq(state == S_IDLE, "HOME: KEY0+KEY2 -> IDLE (KEY0 priority)");
+
+        pulse_btn(1); // IDLE->HOME
+        pulse_vec(4'b1111); // all keys
+        check_eq(state == S_IDLE, "HOME: all keys -> IDLE (KEY0 priority)");
+
+        // ============================================================
+        // Multi-key priority in MSG
+        // ============================================================
+        pulse_btn(1); // IDLE->HOME
+        pulse_btn(1); // HOME->MSG
+        check_eq(state == S_MSG, "MSG entered for multi-key test");
+        check_eq(msg_index == 0, "MSG index reset before multi-key test");
+        pulse_vec(4'b0110); // KEY1+KEY2
+        check_eq(state == S_MSG, "MSG: KEY1+KEY2 stays in MSG");
+        check_eq(msg_index == 1, "MSG: KEY1 priority over KEY2");
+
+        pulse_vec(4'b0011); // KEY0+KEY1
+        check_eq(state == S_HOME, "MSG: KEY0+KEY1 -> HOME (KEY0 priority)");
+
+        pulse_btn(1); // HOME->MSG
+        pulse_vec(4'b0101); // KEY0+KEY2
+        check_eq(state == S_HOME, "MSG: KEY0+KEY2 -> HOME (KEY0 priority)");
+
+        pulse_btn(1); // HOME->MSG
+        pulse_vec(4'b1111); // all keys
+        check_eq(state == S_HOME, "MSG: all keys -> HOME (KEY0 priority)");
+
+        // ============================================================
+        // Reset while in HOME/MSG/SLEEP
+        // ============================================================
+        pulse_btn(1); // HOME->MSG
+        check_eq(state == S_MSG, "MSG entered for reset test");
+        rst_n = 1'b0;
+        @(posedge clk);
+        check_eq(state == S_INIT, "Reset forces INIT from MSG");
+        rst_n = 1'b1;
+        @(posedge clk);
+        check_eq(state == S_IDLE, "INIT -> IDLE after reset (MSG path)");
+
+        pulse_btn(1); // IDLE->HOME
+        check_eq(state == S_HOME, "HOME entered for reset test");
+        rst_n = 1'b0;
+        @(posedge clk);
+        check_eq(state == S_INIT, "Reset forces INIT from HOME");
+        rst_n = 1'b1;
+        @(posedge clk);
+        check_eq(state == S_IDLE, "INIT -> IDLE after reset (HOME path)");
+
+        pulse_btn(1); // IDLE->HOME
+        timeout_flag = 1'b1;
+        @(posedge clk);
+        timeout_flag = 1'b0;
+        @(posedge clk);
+        check_eq(state == S_SLEEP, "Enter SLEEP for reset test");
+        rst_n = 1'b0;
+        @(posedge clk);
+        check_eq(state == S_INIT, "Reset forces INIT from SLEEP");
+        rst_n = 1'b1;
+        @(posedge clk);
+        check_eq(state == S_IDLE, "INIT -> IDLE after reset (SLEEP path)");
 
         // ============================================================
         // TEST 20+: Randomized model-vs-DUT campaign
