@@ -14,6 +14,7 @@
 #include "lcd_graphic.h"
 #include "font.h"
 #include "messages.h"
+#include "render_screen.h"
 
 #define HW_REGS_BASE          0xFC000000
 #define HW_REGS_SPAN          0x04000000
@@ -31,7 +32,6 @@
 
 #define FSM_STATE_FROM_REG(v)  (((v) & FSM_STATUS_STATE_MASK) >> FSM_STATUS_STATE_SHIFT)
 #define FSM_INDEX_FROM_REG(v)  ((v) & FSM_STATUS_INDEX_MASK)
-#define MSG_COUNT              18
 
 typedef enum {
     HW_FSM_INIT  = 0,
@@ -176,52 +176,24 @@ int main(void) {
                    hw_fsm_state_name(hw_fsm_state), hw_fsm_state,
                    hw_msg_index, secs_left, timeout ? 1 : 0);
 
-            switch (hw_fsm_state) {
-                case HW_FSM_INIT:
-                case HW_FSM_IDLE:
-                    if (!backlight_on) { LCDHW_BackLight(true); backlight_on = true; }
-                    LCD_GraphicClear();
-                    LCD_TextOut(0, 0,  "==================");
-                    LCD_TextOut(0, 16, "  DE10-Standard   ");
-                    LCD_TextOut(0, 32, "   LCD Message    ");
-                    LCD_TextOut(0, 48, "  Press Any Key   ");
-                    break;
+            bool want_backlight = render_screen(hw_fsm_state, hw_msg_index);
+            if (want_backlight && !backlight_on) {
+                LCDHW_BackLight(true);
+                backlight_on = true;
+            } else if (!want_backlight && backlight_on) {
+                LCDHW_BackLight(false);
+                backlight_on = false;
+            }
 
-                case HW_FSM_HOME:
-                    if (!backlight_on) { LCDHW_BackLight(true); backlight_on = true; }
-                    LCD_GraphicClear();
-                    LCD_TextOut(0, 0,  "==================");
-                    LCD_TextOut(0, 16, "  Welcome User!   ");
-                    LCD_TextOut(0, 32, " KEY1/KEY2: Msgs  ");
-                    LCD_TextOut(0, 48, " KEY0: Back       ");
-                    break;
-
-                case HW_FSM_MSG: {
-                    int safe_idx = (hw_msg_index < MSG_COUNT) ? hw_msg_index : 0;
-                    if (!backlight_on) { LCDHW_BackLight(true); backlight_on = true; }
-                    LCD_GraphicClear();
-                    LCD_TextOut(0, 0,  (char*)MSG_LIST[safe_idx][0]);
-                    LCD_TextOut(0, 16, (char*)MSG_LIST[safe_idx][1]);
-                    LCD_TextOut(0, 32, (char*)MSG_LIST[safe_idx][2]);
-                    LCD_TextOut(0, 48, (char*)MSG_LIST[safe_idx][3]);
-                    break;
+            if (hw_fsm_state != HW_FSM_INIT &&
+                hw_fsm_state != HW_FSM_IDLE &&
+                hw_fsm_state != HW_FSM_HOME &&
+                hw_fsm_state != HW_FSM_MSG  &&
+                hw_fsm_state != HW_FSM_SLEEP) {
+                if (last_warn_code != 3) {
+                    printf("[WARN] Unknown FSM state value=%d\n", hw_fsm_state);
+                    last_warn_code = 3;
                 }
-
-                case HW_FSM_SLEEP:
-                    LCD_GraphicClear();
-                    if (backlight_on) { LCDHW_BackLight(false); backlight_on = false; }
-                    break;
-
-                default:
-                    if (!backlight_on) { LCDHW_BackLight(true); backlight_on = true; }
-                    LCD_GraphicClear();
-                    LCD_TextOut(0, 16, "  FSM ERROR STATE ");
-                    // FIXED: latch the error so it doesn't redraw every loop
-                    if (last_warn_code != 3) {
-                        printf("[WARN] Unknown FSM state value=%d\n", hw_fsm_state);
-                        last_warn_code = 3;
-                    }
-                    break;
             }
 
             last_hw_state     = hw_fsm_state;

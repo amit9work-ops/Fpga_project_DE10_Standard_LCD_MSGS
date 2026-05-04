@@ -3,7 +3,8 @@
 
 // 18 Messages for Rehabilitation/Treatment Room Display
 // Navigate with: KEY1 (Next), KEY2 (Previous), KEY0 (Back)
-static const char* MSG_LIST[18][4] = {
+#define MSG_COUNT 18
+static const char* MSG_LIST[MSG_COUNT][4] = {
     
     // === WELCOME / STATUS ===
     {" Amit Damari ",        // Message 0: Welcome
