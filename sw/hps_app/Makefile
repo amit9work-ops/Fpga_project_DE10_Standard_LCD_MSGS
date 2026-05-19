@@ -1,9 +1,10 @@
 # Simple Makefile for on-board or cross-compilation
 
-# Default to gcc (native compilation on DE10)
-# To cross-compile, run: make CC=arm-linux-gnueabihf-gcc
-CC ?= gcc
-CFLAGS = -g -Wall -O2
+# Default to gcc (native compilation on DE10).
+# You can still override this on the command line, e.g.:
+#   make CC=arm-linux-gnueabihf-gcc
+CC = gcc
+CFLAGS = -std=gnu99 -g -Wall -O2
 LDFLAGS = -lrt
 
 # Source files

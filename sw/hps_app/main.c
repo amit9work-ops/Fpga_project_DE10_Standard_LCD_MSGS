@@ -8,6 +8,9 @@
 #include <string.h>
 #include <signal.h>     // NEW: graceful shutdown
 #include <time.h>
+#include <errno.h>
+#include <dirent.h>
+#include <limits.h>
 
 #include "LCD_Hw.h"
 #include "LCD_Lib.h"
@@ -15,10 +18,16 @@
 #include "font.h"
 #include "messages.h"
 
-#define HW_REGS_BASE          0xFC000000
-#define HW_REGS_SPAN          0x04000000
-#define HW_REGS_MASK          (HW_REGS_SPAN - 1)
-#define ALT_LWFPGASLVS_OFST   0xFF200000
+#define HPS_REGS_BASE         0xFC000000
+#define HPS_REGS_SPAN         0x04000000
+
+// Lightweight H2F base (fixed Cyclone V SoC physical address)
+#define LW_H2F_BASE           0xFF200000
+
+// From Platform Designer: mm_bridge_0.s0 window exposed to LW master
+// 0x0000_0000 .. 0x0003_FFFF  => 0x0004_0000 bytes
+#define LW_BRIDGE_SPAN        0x00040000
+
 #define BUTTON_PIO_BASE       0x5000
 #define FSM_STATUS_PIO_BASE   0x6000
 #define TIMER_STATUS_PIO_BASE 0x7000
@@ -42,11 +51,13 @@ typedef enum {
 } HwFsmState;
 
 // === Globals ===
-static void *virtual_base = MAP_FAILED;
+static void *hps_virtual_base = MAP_FAILED;
+static void *lw_virtual_base  = MAP_FAILED;
 static volatile uint32_t *button_addr       = NULL;
 static volatile uint32_t *fsm_status_addr   = NULL;
 static volatile uint32_t *timer_status_addr = NULL;
 static int  fd = -1;
+static bool g_lcd_initialized = false;
 
 // NEW: graceful shutdown flag (signal-safe)
 static volatile sig_atomic_t g_shutdown = 0;
@@ -68,14 +79,68 @@ static void signal_handler(int signum) {
     g_shutdown = 1;
 }
 
+static int try_enable_fpga_bridges_in_dir(const char *class_dir) {
+    DIR *dir = opendir(class_dir);
+    if (!dir) return -1;
+
+    int enabled = 0;
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != NULL) {
+        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) continue;
+
+        char enable_path[PATH_MAX];
+        int n = snprintf(enable_path, sizeof(enable_path), "%s/%s/enable", class_dir, ent->d_name);
+        if (n < 0 || (size_t)n >= sizeof(enable_path)) continue;
+        int efd = open(enable_path, O_WRONLY);
+        if (efd < 0) continue;
+
+        // Best-effort: enable bridge; ignore failures.
+        ssize_t w = write(efd, "1\n", 2);
+        if (w > 0) enabled++;
+        close(efd);
+    }
+
+    closedir(dir);
+    return enabled;
+}
+
+// Some Terasic/Linux images leave HPS<->FPGA bridges disabled until enabled via sysfs.
+// If this is the root cause of the hang, enabling here prevents the first MMIO read from stalling.
+static void try_enable_fpga_bridges(void) {
+    int c1 = try_enable_fpga_bridges_in_dir("/sys/class/fpga_bridge");
+    int c2 = try_enable_fpga_bridges_in_dir("/sys/class/fpga-bridge");
+    if (c1 >= 0 || c2 >= 0) {
+        printf("FPGA bridge enable: fpga_bridge=%d, fpga-bridge=%d\n", c1, c2);
+    } else {
+        printf("FPGA bridge enable: no sysfs bridge class found (skipping)\n");
+    }
+}
+
+static bool lw_offset_in_range(uint32_t offset, const char *name) {
+    if ((uint64_t)offset + sizeof(uint32_t) > (uint64_t)LW_BRIDGE_SPAN) {
+        fprintf(stderr,
+                "ERROR: %s offset 0x%08X is outside LW bridge span (0x%08X bytes)\n",
+                name, offset, (unsigned)LW_BRIDGE_SPAN);
+        return false;
+    }
+    return true;
+}
+
 // NEW: centralized cleanup so every exit path releases resources
 static void cleanup(void) {
     // Try to leave LCD in a sane state
-    if (virtual_base != MAP_FAILED) {
+    if (g_lcd_initialized) {
         LCDHW_BackLight(false);
         LCD_GraphicClear();
-        munmap(virtual_base, HW_REGS_SPAN);
-        virtual_base = MAP_FAILED;
+    }
+
+    if (lw_virtual_base != MAP_FAILED) {
+        munmap(lw_virtual_base, LW_BRIDGE_SPAN);
+        lw_virtual_base = MAP_FAILED;
+    }
+    if (hps_virtual_base != MAP_FAILED) {
+        munmap(hps_virtual_base, HPS_REGS_SPAN);
+        hps_virtual_base = MAP_FAILED;
     }
     if (fd >= 0) {
         close(fd);
@@ -85,9 +150,16 @@ static void cleanup(void) {
 }
 
 int main(void) {
+    // Make prints visible immediately (helps pinpoint exactly where a hang occurs)
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
+
     // NEW: install signal handlers BEFORE opening hardware
     signal(SIGINT,  signal_handler);
     signal(SIGTERM, signal_handler);
+
+    // Best-effort enable of FPGA bridges (if supported by this Linux image)
+    try_enable_fpga_bridges();
 
     printf("Opening /dev/mem...\n");
     fd = open("/dev/mem", O_RDWR | O_SYNC);
@@ -96,41 +168,60 @@ int main(void) {
         return 1;
     }
 
-    printf("Memory mapping...\n");
-    virtual_base = mmap(NULL, HW_REGS_SPAN, PROT_READ | PROT_WRITE,
-                       MAP_SHARED, fd, HW_REGS_BASE);
-    if (virtual_base == MAP_FAILED) {
-        perror("ERROR: mmap failed");
+    printf("Memory mapping (HPS regs @ 0x%08X, span 0x%08X)...\n",
+           (unsigned)HPS_REGS_BASE, (unsigned)HPS_REGS_SPAN);
+    hps_virtual_base = mmap(NULL, HPS_REGS_SPAN, PROT_READ | PROT_WRITE,
+                            MAP_SHARED, fd, HPS_REGS_BASE);
+    if (hps_virtual_base == MAP_FAILED) {
+        perror("ERROR: mmap HPS regs failed");
         close(fd);
         return 1;
     }
-    printf("  virtual_base = %p\n", virtual_base);
+    printf("  hps_virtual_base = %p\n", hps_virtual_base);
 
-    // Map register pointers
-    button_addr       = (uint32_t *)((char*)virtual_base +
-        ((ALT_LWFPGASLVS_OFST + BUTTON_PIO_BASE)       & HW_REGS_MASK));
-    fsm_status_addr   = (uint32_t *)((char*)virtual_base +
-        ((ALT_LWFPGASLVS_OFST + FSM_STATUS_PIO_BASE)   & HW_REGS_MASK));
-    timer_status_addr = (uint32_t *)((char*)virtual_base +
-        ((ALT_LWFPGASLVS_OFST + TIMER_STATUS_PIO_BASE) & HW_REGS_MASK));
-    printf("  button_addr       = %p\n", (void*)button_addr);
-    printf("  fsm_status_addr   = %p\n", (void*)fsm_status_addr);
-    printf("  timer_status_addr = %p\n", (void*)timer_status_addr);
+    printf("Memory mapping (LW bridge @ 0x%08X, span 0x%08X)...\n",
+           (unsigned)LW_H2F_BASE, (unsigned)LW_BRIDGE_SPAN);
+    lw_virtual_base = mmap(NULL, LW_BRIDGE_SPAN, PROT_READ | PROT_WRITE,
+                           MAP_SHARED, fd, LW_H2F_BASE);
+    if (lw_virtual_base == MAP_FAILED) {
+        perror("ERROR: mmap LW bridge failed");
+        cleanup();
+        return 1;
+    }
+    printf("  lw_virtual_base  = %p\n", lw_virtual_base);
 
-    // NEW: bridge sanity check — if all 0xFFFFFFFF, the FPGA is not responding
+    // Validate offsets are inside the routed mm_bridge_0 window
+    if (!lw_offset_in_range(BUTTON_PIO_BASE, "button_pio") ||
+        !lw_offset_in_range(FSM_STATUS_PIO_BASE, "fsm_status_pio") ||
+        !lw_offset_in_range(TIMER_STATUS_PIO_BASE, "timer_status_pio")) {
+        cleanup();
+        return 1;
+    }
+
+    // Map LW bridge register pointers (offsets are relative to LW base)
+    button_addr       = (volatile uint32_t *)((uint8_t*)lw_virtual_base + BUTTON_PIO_BASE);
+    fsm_status_addr   = (volatile uint32_t *)((uint8_t*)lw_virtual_base + FSM_STATUS_PIO_BASE);
+    timer_status_addr = (volatile uint32_t *)((uint8_t*)lw_virtual_base + TIMER_STATUS_PIO_BASE);
+    printf("  button_addr       = %p (LW + 0x%04X)\n", (void*)button_addr, (unsigned)BUTTON_PIO_BASE);
+    printf("  fsm_status_addr   = %p (LW + 0x%04X)\n", (void*)fsm_status_addr, (unsigned)FSM_STATUS_PIO_BASE);
+    printf("  timer_status_addr = %p (LW + 0x%04X)\n", (void*)timer_status_addr, (unsigned)TIMER_STATUS_PIO_BASE);
+
+    // NOTE: A wrong/disabled bridge can hard-hang the CPU on the first MMIO read.
+    // Keep this first access narrow and well-defined.
     uint32_t probe = *fsm_status_addr;
     if (probe == 0xFFFFFFFFu) {
-        fprintf(stderr, "ERROR: FPGA bridge returned 0xFFFFFFFF. "
-                        "Is the .rbf programmed and Qsys addresses correct?\n");
+        fprintf(stderr, "ERROR: fsm_status read returned 0xFFFFFFFF. "
+                        "Is the FPGA programmed and LW bridge enabled?\n");
         cleanup();
         return 2;
     }
 
     printf("Initializing LCD...\n");
-    LCDHW_Init(virtual_base);
+    LCDHW_Init(hps_virtual_base);
     LCD_Init();
     LCD_GraphicClear();
     LCDHW_BackLight(true);
+    g_lcd_initialized = true;
     printf("LCD Ready.\n");
 
     int  last_hw_state     = -1;

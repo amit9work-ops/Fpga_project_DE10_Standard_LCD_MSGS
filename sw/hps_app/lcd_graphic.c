@@ -34,7 +34,7 @@ void DRAW_Refresh(LCD_CANVAS *pCanvas) {
 }
 
 void DRAW_Line(LCD_CANVAS *pCanvas, int X1, int Y1, int X2, int Y2, int Color) {
-    int x, y, dx, dy, sx, sy, err, e2;
+    int dx, dy, sx, sy, err, e2;
     
     dx = abs(X2 - X1);
     dy = abs(Y2 - Y1);

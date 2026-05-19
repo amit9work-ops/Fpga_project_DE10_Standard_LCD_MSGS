@@ -125,6 +125,24 @@ We have provided an automated PowerShell script to fix Qsys and compile the desi
     ./lcd_msg_app
     ```
 
+### 3. Build HPS Software (Windows via WSL cross-compile)
+If you are on Windows, do **not** run `make` directly in PowerShell/CMD unless you have a full ARM-Linux cross toolchain installed.
+The simplest supported path is WSL (Ubuntu) + `arm-linux-gnueabihf-gcc`.
+
+1. Install toolchain inside WSL (run once):
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y make gcc-arm-linux-gnueabihf binutils-arm-linux-gnueabihf libc6-dev-armhf-cross
+    ```
+
+2. Build from Windows by invoking WSL:
+    ```powershell
+    wsl -d Ubuntu -- bash -lc "cd /mnt/c/Fpga_project_DE10_Standard_LCD_MSGS_-V2/sw/hps_app && make clean && make CC=arm-linux-gnueabihf-gcc"
+    ```
+
+3. The file you copy to the SD card is the single ARM-Linux executable:
+    - `sw/hps_app/lcd_msg_app`
+
 ## Notes
 *   If Qsys generation fails, refer to `hw/quartus/README_QSYS_FIX.txt` for manual repair instructions.
 *   The `build_fpga.ps1` script is an alternative if you have already fixed Qsys manually.
