@@ -75,3 +75,9 @@ hw/output/
 
 # Qsys generated output folder (the .qsys file is the source)
 **/soc_system/
+
+# Additional Quartus generated files
+**/output_files/*.cdf
+
+# Simulation files
+sim.vvp
