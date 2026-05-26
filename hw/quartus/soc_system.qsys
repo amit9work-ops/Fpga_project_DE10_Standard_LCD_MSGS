@@ -13,7 +13,7 @@
    {
       datum _sortIndex
       {
-         value = "10";
+         value = "12";
          type = "int";
       }
    }
@@ -21,7 +21,7 @@
    {
       datum baseAddress
       {
-         value = "196608";
+         value = "0";
          type = "String";
       }
    }
@@ -42,7 +42,7 @@
       }
       datum baseAddress
       {
-         value = "20480";
+         value = "320";
          type = "String";
       }
    }
@@ -50,7 +50,7 @@
    {
       datum _sortIndex
       {
-         value = "11";
+         value = "13";
          type = "int";
       }
    }
@@ -79,49 +79,7 @@
       }
       datum baseAddress
       {
-         value = "16384";
-         type = "String";
-      }
-   }
-   element fsm_status_pio
-   {
-      datum _sortIndex
-      {
-         value = "8";
-         type = "int";
-      }
-   }
-   element fsm_status_pio.s1
-   {
-      datum _lockedAddress
-      {
-         value = "0";
-         type = "boolean";
-      }
-      datum baseAddress
-      {
-         value = "24576";
-         type = "String";
-      }
-   }
-   element timer_status_pio
-   {
-      datum _sortIndex
-      {
-         value = "9";
-         type = "int";
-      }
-   }
-   element timer_status_pio.s1
-   {
-      datum _lockedAddress
-      {
-         value = "0";
-         type = "boolean";
-      }
-      datum baseAddress
-      {
-         value = "28672";
+         value = "304";
          type = "String";
       }
    }
@@ -141,6 +99,27 @@
          type = "int";
       }
    }
+   element fsm_status_pio
+   {
+      datum _sortIndex
+      {
+         value = "8";
+         type = "int";
+      }
+   }
+   element fsm_status_pio.s1
+   {
+      datum _lockedAddress
+      {
+         value = "0";
+         type = "boolean";
+      }
+      datum baseAddress
+      {
+         value = "272";
+         type = "String";
+      }
+   }
    element hps_0
    {
       datum _sortIndex
@@ -150,6 +129,14 @@
       }
    }
    element hps_0.f2h_axi_slave
+   {
+      datum baseAddress
+      {
+         value = "0";
+         type = "String";
+      }
+   }
+   element hps_0.f2h_sdram0_data
    {
       datum baseAddress
       {
@@ -169,7 +156,7 @@
    {
       datum _sortIndex
       {
-         value = "9";
+         value = "10";
          type = "int";
       }
    }
@@ -203,7 +190,7 @@
       }
       datum baseAddress
       {
-         value = "12288";
+         value = "288";
          type = "String";
       }
    }
@@ -211,8 +198,16 @@
    {
       datum _sortIndex
       {
-         value = "8";
+         value = "9";
          type = "int";
+      }
+   }
+   element mm_bridge_0.s0
+   {
+      datum baseAddress
+      {
+         value = "0";
+         type = "String";
       }
    }
    element sysid_qsys
@@ -232,7 +227,28 @@
       }
       datum baseAddress
       {
-         value = "4096";
+         value = "336";
+         type = "String";
+      }
+   }
+   element timer_status_pio
+   {
+      datum _sortIndex
+      {
+         value = "11";
+         type = "int";
+      }
+   }
+   element timer_status_pio.s1
+   {
+      datum _lockedAddress
+      {
+         value = "0";
+         type = "boolean";
+      }
+      datum baseAddress
+      {
+         value = "256";
          type = "String";
       }
    }
@@ -274,11 +290,6 @@
    type="conduit"
    dir="end" />
  <interface
-   name="timer_status_pio_external_connection"
-   internal="timer_status_pio.external_connection"
-   type="conduit"
-   dir="end" />
- <interface
    name="hps_0_f2h_cold_reset_req"
    internal="hps_0.f2h_cold_reset_req"
    type="reset"
@@ -311,6 +322,11 @@
    dir="end" />
  <interface name="memory" internal="hps_0.memory" type="conduit" dir="end" />
  <interface name="reset" internal="clk_0.clk_in_reset" type="reset" dir="end" />
+ <interface
+   name="timer_status_pio_external_connection"
+   internal="timer_status_pio.external_connection"
+   type="conduit"
+   dir="end" />
  <module
    name="ILC"
    kind="interrupt_latency_counter"
@@ -381,6 +397,24 @@
   <parameter name="FIFO_DEPTHS" value="2" />
   <parameter name="PLI_PORT" value="50000" />
   <parameter name="USE_PLI" value="0" />
+ </module>
+ <module
+   name="fsm_status_pio"
+   kind="altera_avalon_pio"
+   version="21.1"
+   enabled="1">
+  <parameter name="bitClearingEdgeCapReg" value="false" />
+  <parameter name="bitModifyingOutReg" value="false" />
+  <parameter name="captureEdge" value="false" />
+  <parameter name="clockRate" value="50000000" />
+  <parameter name="direction" value="Input" />
+  <parameter name="edgeType" value="RISING" />
+  <parameter name="generateIRQ" value="false" />
+  <parameter name="irqType" value="LEVEL" />
+  <parameter name="resetValue" value="0" />
+  <parameter name="simDoTestBenchWiring" value="false" />
+  <parameter name="simDrivenValue" value="0" />
+  <parameter name="width" value="8" />
  </module>
  <module name="hps_0" kind="altera_hps" version="21.1" enabled="1">
   <parameter name="ABSTRACT_REAL_COMPARE_TEST" value="false" />
@@ -959,34 +993,6 @@
   <parameter name="simDrivenValue" value="0" />
   <parameter name="width" value="10" />
  </module>
- <module name="fsm_status_pio" kind="altera_avalon_pio" version="21.1" enabled="1">
-  <parameter name="bitClearingEdgeCapReg" value="false" />
-  <parameter name="bitModifyingOutReg" value="false" />
-  <parameter name="captureEdge" value="false" />
-  <parameter name="clockRate" value="50000000" />
-  <parameter name="direction" value="Input" />
-  <parameter name="edgeType" value="RISING" />
-  <parameter name="generateIRQ" value="false" />
-  <parameter name="irqType" value="LEVEL" />
-  <parameter name="resetValue" value="0" />
-  <parameter name="simDoTestBenchWiring" value="false" />
-  <parameter name="simDrivenValue" value="0" />
-  <parameter name="width" value="8" />
- </module>
- <module name="timer_status_pio" kind="altera_avalon_pio" version="21.1" enabled="1">
-  <parameter name="bitClearingEdgeCapReg" value="false" />
-  <parameter name="bitModifyingOutReg" value="false" />
-  <parameter name="captureEdge" value="false" />
-  <parameter name="clockRate" value="50000000" />
-  <parameter name="direction" value="Input" />
-  <parameter name="edgeType" value="RISING" />
-  <parameter name="generateIRQ" value="false" />
-  <parameter name="irqType" value="LEVEL" />
-  <parameter name="resetValue" value="0" />
-  <parameter name="simDoTestBenchWiring" value="false" />
-  <parameter name="simDrivenValue" value="0" />
-  <parameter name="width" value="8" />
- </module>
  <module
    name="mm_bridge_0"
    kind="altera_avalon_mm_bridge"
@@ -1012,6 +1018,24 @@
    enabled="1">
   <parameter name="id" value="-1395322110" />
  </module>
+ <module
+   name="timer_status_pio"
+   kind="altera_avalon_pio"
+   version="21.1"
+   enabled="1">
+  <parameter name="bitClearingEdgeCapReg" value="false" />
+  <parameter name="bitModifyingOutReg" value="false" />
+  <parameter name="captureEdge" value="false" />
+  <parameter name="clockRate" value="50000000" />
+  <parameter name="direction" value="Input" />
+  <parameter name="edgeType" value="RISING" />
+  <parameter name="generateIRQ" value="false" />
+  <parameter name="irqType" value="LEVEL" />
+  <parameter name="resetValue" value="0" />
+  <parameter name="simDoTestBenchWiring" value="false" />
+  <parameter name="simDrivenValue" value="0" />
+  <parameter name="width" value="8" />
+ </module>
  <connection
    kind="avalon"
    version="21.1"
@@ -1036,7 +1060,7 @@
    start="mm_bridge_0.m0"
    end="ILC.avalon_slave">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x00030000" />
+  <parameter name="baseAddress" value="0x0000" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
@@ -1045,7 +1069,7 @@
    start="mm_bridge_0.m0"
    end="sysid_qsys.control_slave">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x1000" />
+  <parameter name="baseAddress" value="0x0150" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
@@ -1054,7 +1078,7 @@
    start="mm_bridge_0.m0"
    end="button_pio.s1">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x5000" />
+  <parameter name="baseAddress" value="0x0140" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
@@ -1063,12 +1087,30 @@
    start="mm_bridge_0.m0"
    end="dipsw_pio.s1">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x4000" />
+  <parameter name="baseAddress" value="0x0130" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection kind="avalon" version="21.1" start="mm_bridge_0.m0" end="led_pio.s1">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x3000" />
+  <parameter name="baseAddress" value="0x0120" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="21.1"
+   start="mm_bridge_0.m0"
+   end="fsm_status_pio.s1">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0110" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="21.1"
+   start="mm_bridge_0.m0"
+   end="timer_status_pio.s1">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0100" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
@@ -1086,7 +1128,7 @@
    start="fpga_only_master.master"
    end="ILC.avalon_slave">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x00030000" />
+  <parameter name="baseAddress" value="0x0000" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
@@ -1095,7 +1137,7 @@
    start="fpga_only_master.master"
    end="sysid_qsys.control_slave">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x1000" />
+  <parameter name="baseAddress" value="0x0150" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
@@ -1122,7 +1164,7 @@
    start="fpga_only_master.master"
    end="led_pio.s1">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x3000" />
+  <parameter name="baseAddress" value="0x0120" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
@@ -1131,7 +1173,7 @@
    start="fpga_only_master.master"
    end="dipsw_pio.s1">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x4000" />
+  <parameter name="baseAddress" value="0x0130" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
@@ -1140,25 +1182,7 @@
    start="fpga_only_master.master"
    end="button_pio.s1">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x5000" />
-  <parameter name="defaultConnection" value="false" />
- </connection>
- <connection
-   kind="avalon"
-   version="21.1"
-   start="mm_bridge_0.m0"
-   end="fsm_status_pio.s1">
-  <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x6000" />
-  <parameter name="defaultConnection" value="false" />
- </connection>
- <connection
-   kind="avalon"
-   version="21.1"
-   start="mm_bridge_0.m0"
-   end="timer_status_pio.s1">
-  <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x7000" />
+  <parameter name="baseAddress" value="0x0140" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
@@ -1175,8 +1199,16 @@
    end="fpga_only_master.clk" />
  <connection kind="clock" version="21.1" start="clk_0.clk" end="dipsw_pio.clk" />
  <connection kind="clock" version="21.1" start="clk_0.clk" end="button_pio.clk" />
- <connection kind="clock" version="21.1" start="clk_0.clk" end="fsm_status_pio.clk" />
- <connection kind="clock" version="21.1" start="clk_0.clk" end="timer_status_pio.clk" />
+ <connection
+   kind="clock"
+   version="21.1"
+   start="clk_0.clk"
+   end="fsm_status_pio.clk" />
+ <connection
+   kind="clock"
+   version="21.1"
+   start="clk_0.clk"
+   end="timer_status_pio.clk" />
  <connection kind="clock" version="21.1" start="clk_0.clk" end="jtag_uart.clk" />
  <connection kind="clock" version="21.1" start="clk_0.clk" end="ILC.clk" />
  <connection
