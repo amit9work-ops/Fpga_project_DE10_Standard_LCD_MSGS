@@ -314,6 +314,12 @@ ls -la
 
 `pwd` must print `/home/root/hps_app`.
 
+Critical note (prevents the most common “LCD stuck” issue):
+
+1. Always `cd` into the folder that contains the exact `main.c` you intend to build.
+2. Always run `./lcd_msg_app` from that same folder.
+   (If you have multiple copies like `/home/root/hps_app` and `~/hps_lcd`, it’s easy to edit one but build/run the other.)
+
 ### 8.2 Fix Windows line-ending issues (prevents common `make` failures)
 
 Run this once after copying files from Windows:
@@ -366,6 +372,14 @@ Expected startup log lines include:
 6. `=== LCD MESSAGE SYSTEM STARTED ===`
 
 If these appear, Linux-side startup is correct.
+
+Sanity check (must match): on startup, the app prints the LW offsets it uses, e.g.:
+
+- `button_addr ... (LW + 0x0140)`
+- `fsm_status_addr ... (LW + 0x0110)`
+- `timer_status_addr ... (LW + 0x0100)`
+
+If it prints `0x5000/0x6000/0x7000`, your HPS app is built with the wrong offsets and the LCD will not follow the FPGA FSM.
 
 ### 8.6 Stop app safely
 
@@ -452,6 +466,28 @@ If you see `fsm_status read returned 0xFFFFFFFF`:
 1. FPGA may not be programmed with correct `.sof`.
 2. Reprogram in Quartus Programmer.
 3. Reboot board and rerun app.
+
+If LCD is stuck but 7-seg/buttons behave correctly:
+
+This usually means the HPS app is reading the wrong LW-bridge offsets.
+
+1. Verify the FPGA-side register map directly (these are known-good for this build):
+   ```bash
+   devmem 0xFF200150 32   # sysid (sanity check: should be non-zero)
+   devmem 0xFF200140 32   # button_pio (raw buttons, active-low)
+   devmem 0xFF200110 32   # fsm_status_pio
+   devmem 0xFF200100 32   # timer_status_pio
+   ```
+2. Verify the HPS app uses the same LW offsets in `main.c`:
+   - `BUTTON_PIO_BASE = 0x0140`
+   - `FSM_STATUS_PIO_BASE = 0x0110`
+   - `TIMER_STATUS_PIO_BASE = 0x0100`
+3. Rebuild and run from the same folder:
+   ```bash
+   make clean
+   make
+   ./lcd_msg_app
+   ```
 
 If LCD stays blank:
 
