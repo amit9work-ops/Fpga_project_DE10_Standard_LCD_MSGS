@@ -28,9 +28,9 @@
 // 0x0000_0000 .. 0x0003_FFFF  => 0x0004_0000 bytes
 #define LW_BRIDGE_SPAN        0x00040000
 
-#define BUTTON_PIO_BASE       0x5000
-#define FSM_STATUS_PIO_BASE   0x6000
-#define TIMER_STATUS_PIO_BASE 0x7000
+#define BUTTON_PIO_BASE       0x0140
+#define FSM_STATUS_PIO_BASE   0x0110
+#define TIMER_STATUS_PIO_BASE 0x0100
 #define BUTTON_MASK           0x0F
 #define TIMEOUT_SECONDS       15
 

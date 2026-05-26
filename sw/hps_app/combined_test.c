@@ -16,7 +16,7 @@
 #define HW_REGS_SPAN          0x04000000
 #define HW_REGS_MASK          (HW_REGS_SPAN - 1)
 #define ALT_LWFPGASLVS_OFST   0xFF200000
-#define BUTTON_PIO_BASE       0x5000
+#define BUTTON_PIO_BASE       0x0140
 #define BUTTON_MASK           0x0F
 
 void *virtual_base = NULL;
