@@ -426,7 +426,7 @@ else
 end
 
 assign LEDR[0]=led_level;
-assign GPIO[0] = KEY[0];
+assign GPIO[0] = HPS_UART_TX;
 assign GPIO[1] = ctrl_btn_debounced[0];
 assign GPIO[2] = KEY[1];
 assign GPIO[3] = ctrl_btn_debounced[1];
