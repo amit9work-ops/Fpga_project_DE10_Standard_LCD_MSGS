@@ -432,7 +432,7 @@ assign GPIO[2] = KEY[1];
 assign GPIO[3] = ctrl_btn_debounced[1];
 assign GPIO[4] = counter[15];
 assign GPIO[5] = ctrl_fsm_state[0];
-assign GPIO[6] = HPS_LCM_SPIM_SS;
+assign GPIO[6] = ctrl_btn_pulse[0];
 assign GPIO[7] = led_level;
 
 // ============================================================================
