@@ -116,6 +116,7 @@ module DE10_Standard_GHRD(
 
       ///////// GPIO /////////
       inout    [35: 0]   GPIO,
+      output   [ 7: 0]   DEBUG_GPIO,
 
 `ifdef ENABLE_HSMC
       ///////// HSMC /////////
@@ -426,6 +427,14 @@ else
 end
 
 assign LEDR[0]=led_level;
+assign DEBUG_GPIO[0] = KEY[0];
+assign DEBUG_GPIO[1] = ctrl_btn_debounced[0];
+assign DEBUG_GPIO[2] = KEY[1];
+assign DEBUG_GPIO[3] = ctrl_btn_debounced[1];
+assign DEBUG_GPIO[4] = counter[15];
+assign DEBUG_GPIO[5] = ctrl_fsm_state[0];
+assign DEBUG_GPIO[6] = HPS_LCM_SPIM_SS;
+assign DEBUG_GPIO[7] = led_level;
 
 // ============================================================================
 // Custom LCD Message Controller
