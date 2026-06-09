@@ -425,15 +425,29 @@ else
                 counter<=counter+1'b1;
 end
 
+// Pulse stretcher: hold btn0_stretched HIGH for 20ms after each KEY0 press
+// 1_000_000 cycles @ 50 MHz = 20 ms — visible on oscilloscope without triggering
+reg [19:0] dbg_stretch;
+always @(posedge fpga_clk_50 or negedge hps_fpga_reset_n) begin
+    if (~hps_fpga_reset_n)
+        dbg_stretch <= 20'd0;
+    else if (ctrl_btn_pulse[0])
+        dbg_stretch <= 20'd1_000_000;
+    else if (dbg_stretch != 20'd0)
+        dbg_stretch <= dbg_stretch - 1'b1;
+end
+wire btn0_stretched = (dbg_stretch != 20'd0);
+
 assign LEDR[0]=led_level;
-assign GPIO[0] = KEY[0];
-assign GPIO[1] = ctrl_btn_debounced[0];
-assign GPIO[2] = KEY[1];
-assign GPIO[3] = ctrl_btn_debounced[1];
-assign GPIO[4] = counter[15];
-assign GPIO[5] = ctrl_fsm_state[0];
-assign GPIO[6] = ctrl_btn_pulse[0];
-assign GPIO[7] = led_level;
+// ---- Oscilloscope debug mapping on GPIO[7:0] ----
+assign GPIO[0] = ctrl_btn_debounced[0];  // KEY0: stable active-HIGH level (scope trigger ref)
+assign GPIO[1] = ctrl_btn_debounced[1];  // KEY1: stable active-HIGH level (second button channel)
+assign GPIO[2] = btn0_stretched;         // KEY0 press: 20ms pulse (clearly visible on scope)
+assign GPIO[3] = ctrl_timeout_flag;      // HIGH after 15s idle, resets on any button press
+assign GPIO[4] = counter[23];            // ~3 Hz square wave, always running
+assign GPIO[5] = counter[25];            // ~0.75 Hz square wave, always running
+assign GPIO[6] = ctrl_fsm_state[1];      // FSM state bit 1
+assign GPIO[7] = ctrl_fsm_state[0];      // FSM state bit 0 — bits [7:6]: 00=IDLE,10=HOME,11=MSG,01=SLEEP
 
 // ============================================================================
 // Custom LCD Message Controller
