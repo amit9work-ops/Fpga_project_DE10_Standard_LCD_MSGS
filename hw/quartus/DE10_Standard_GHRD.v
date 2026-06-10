@@ -440,8 +440,8 @@ wire btn0_stretched = (dbg_stretch != 20'd0);
 
 assign LEDR[0]=led_level;
 // ---- Oscilloscope debug mapping on GPIO[7:0] ----
-assign GPIO[0] = ctrl_btn_debounced[0];  // KEY0: stable active-HIGH level (scope trigger ref)
-assign GPIO[1] = ctrl_btn_debounced[1];  // KEY1: stable active-HIGH level (second button channel)
+assign GPIO[0] = ~KEY[0];                // KEY0: raw active-HIGH input before debouncer
+assign GPIO[1] = ctrl_btn_debounced[0];  // KEY0: stable active-HIGH level after debouncer
 assign GPIO[2] = btn0_stretched;         // KEY0 press: 20ms pulse (clearly visible on scope)
 assign GPIO[3] = ctrl_timeout_flag;      // HIGH after 15s idle, resets on any button press
 assign GPIO[4] = counter[23];            // ~3 Hz square wave, always running
