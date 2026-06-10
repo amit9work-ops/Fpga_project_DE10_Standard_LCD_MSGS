@@ -151,9 +151,9 @@ module tb_fpga_msg_controller;
         check_bool(|btn_debounced, 1'b0, "Init debounced=0");
         check_bool(|btn_pulse,     1'b0, "Init pulse=0");
         check_bool(timeout_flag,   1'b0, "Init no timeout");
-        check_bool(hex0 == seven_seg(4'd3), 1'b1, "Init HEX0 exact");
-        check_bool(hex1 == seven_seg(4'hF), 1'b1, "Init HEX1 exact");
-        check_bool(hex2 == seven_seg(4'd0), 1'b1, "Init HEX2 exact");
+        check_bool(hex5 == seven_seg(4'd0), 1'b1, "Init HEX5 timer tens exact");
+        check_bool(hex4 == seven_seg(4'd3), 1'b1, "Init HEX4 timer ones exact");
+        check_bool(hex2 == seven_seg(4'hF), 1'b1, "Init HEX2 last key exact");
         check_bool(fsm_state == S_IDLE, 1'b1, "Init FSM in IDLE");
 
         // ============================================================
@@ -165,7 +165,7 @@ module tb_fpga_msg_controller;
         repeat (1010) @(posedge clk);
 
         check_bool(btn_debounced[0], 1'b1, "KEY0 debounced");
-        check_bool(hex1 == seven_seg(4'd0), 1'b1, "HEX1 shows last key=0");
+        check_bool(hex2 == seven_seg(4'd0), 1'b1, "HEX2 shows last key=0");
         check_bool(fsm_state == S_HOME, 1'b1, "FSM IDLE->HOME on first press");
 
         // The pulse should have appeared about 1002 cycles after press
@@ -197,8 +197,8 @@ module tb_fpga_msg_controller;
         repeat (CLK_FREQ_HZ) @(posedge clk);
         $display("  seconds_remaining=%0d (expect 0)", seconds_remaining);
         check_bool(timeout_flag, 1'b1, "Timeout after countdown");
-        check_bool(hex2 == seven_seg(4'd1), 1'b1, "HEX2 timeout exact");
-        check_bool(hex0 == seven_seg(4'd0), 1'b1, "HEX0 zero exact on timeout");
+        check_bool(hex5 == seven_seg(4'd0), 1'b1, "HEX5 zero tens exact on timeout");
+        check_bool(hex4 == seven_seg(4'd0), 1'b1, "HEX4 zero ones exact on timeout");
         check_bool(fsm_state == S_SLEEP, 1'b1, "FSM HOME->SLEEP on timeout");
 
         // ============================================================
@@ -209,8 +209,8 @@ module tb_fpga_msg_controller;
 
         check_bool(timeout_flag, 1'b0, "Timer reset by KEY1");
         $display("  seconds_remaining=%0d (expect 2)", seconds_remaining);
-        check_bool(hex1 == seven_seg(4'd1), 1'b1, "HEX1 shows last key=1");
-        check_bool(hex2 == seven_seg(4'd0), 1'b1, "HEX2 running exact");
+        check_bool(hex2 == seven_seg(4'd1), 1'b1, "HEX2 shows last key=1");
+        check_bool(hex0 == seven_seg(4'd0), 1'b1, "HEX0 reserved exact");
         check_bool(fsm_state == S_IDLE, 1'b1, "FSM SLEEP->IDLE on wake press");
 
         key_in[1] = 1'b1;  // Release KEY1
@@ -219,10 +219,11 @@ module tb_fpga_msg_controller;
         // ============================================================
         // TEST 6: HEX display exact values while running
         // ============================================================
-        check_bool(hex0 == seven_seg(4'd1), 1'b1, "HEX0 exact one second after KEY1 reset");
+        check_bool(hex4 == seven_seg(4'd1), 1'b1, "HEX4 timer ones exact one second after KEY1 reset");
+        check_bool(hex0 == seven_seg(4'd0), 1'b1, "HEX0 reserved exact");
+        check_bool(hex1 == seven_seg(4'd0), 1'b1, "HEX1 reserved exact");
         check_bool(hex3 == seven_seg(4'd0), 1'b1, "HEX3 reserved exact");
-        check_bool(hex4 == seven_seg(4'd0), 1'b1, "HEX4 reserved exact");
-        check_bool(hex5 == seven_seg(4'd0), 1'b1, "HEX5 reserved exact");
+        check_bool(hex5 == seven_seg(4'd0), 1'b1, "HEX5 timer tens exact");
 
         check_bool(pulse_width_errors == 0, 1'b1, "All pulses are single-cycle width");
 

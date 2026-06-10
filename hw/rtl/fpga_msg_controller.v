@@ -104,10 +104,10 @@ module fpga_msg_controller #(
 
     // ================================================================
     // Stage 5: HEX Display
-    //   HEX0: Timer countdown (0–F seconds)
-    //   HEX1: Last button pressed (0–3, F=none)
-    //   HEX2: Timeout status (0=running, 1=expired)
-    //   HEX3-5: Reserved (show 0)
+    //   HEX5: Timer tens digit
+    //   HEX4: Timer ones digit
+    //   HEX2: Last button pressed (0–3, F=none)
+    //   HEX0/1/3: Reserved (show 0)
     // ================================================================
     // Encode which button was last pressed (priority: KEY0 > KEY1 > KEY2 > KEY3)
     reg [3:0] last_btn_display;
@@ -125,13 +125,18 @@ module fpga_msg_controller #(
         // else: hold last value
     end
 
+    wire [3:0] timer_tens_digit;
+    wire [3:0] timer_ones_digit;
+    assign timer_tens_digit = (seconds_remaining >= 4'd10) ? 4'd1 : 4'd0;
+    assign timer_ones_digit = (seconds_remaining >= 4'd10) ? (seconds_remaining - 4'd10) : seconds_remaining;
+
     hex_display u_hex (
-        .digit0 (seconds_remaining),       // HEX0: timer countdown
-        .digit1 (last_btn_display),         // HEX1: last button (F=none)
-        .digit2 ({3'b0, timeout_flag}),     // HEX2: timeout status
+        .digit0 (4'h0),                     // HEX0: reserved
+        .digit1 (4'h0),                     // HEX1: reserved
+        .digit2 (last_btn_display),         // HEX2: last button (F=none)
         .digit3 (4'h0),                     // HEX3: reserved
-        .digit4 (4'h0),                     // HEX4: reserved
-        .digit5 (4'h0),                     // HEX5: reserved
+        .digit4 (timer_ones_digit),         // HEX4: timer ones digit
+        .digit5 (timer_tens_digit),         // HEX5: timer tens digit
         .hex0   (hex0),
         .hex1   (hex1),
         .hex2   (hex2),

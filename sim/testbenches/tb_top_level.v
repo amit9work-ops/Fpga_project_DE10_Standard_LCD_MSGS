@@ -98,15 +98,15 @@ module tb_top_level;
 
         check(LEDR[4] == 1'b0, "Init timeout LED low");
         check(LEDR[3:0] == 4'b0000, "Init debounced LEDs low");
-        check(HEX1 == seven_seg(4'hF), "Init HEX1 shows F");
-        check(HEX2 == seven_seg(4'h0), "Init HEX2 shows 0");
-        check(HEX0 == seven_seg(4'd3), "Init HEX0 shows timeout value");
+        check(HEX2 == seven_seg(4'hF), "Init HEX2 shows F");
+        check(HEX5 == seven_seg(4'h0), "Init HEX5 shows timer tens");
+        check(HEX4 == seven_seg(4'd3), "Init HEX4 shows timer ones");
 
         // Press KEY1 (bit1)
         KEY[1] = 1'b0;
         repeat (1010) @(posedge CLOCK_50);
         check(LEDR[1] == 1'b1, "KEY1 debounced reflected on LEDR[1]");
-        check(HEX1 == seven_seg(4'd1), "HEX1 tracks last button KEY1");
+        check(HEX2 == seven_seg(4'd1), "HEX2 tracks last button KEY1");
 
         KEY[1] = 1'b1;
         repeat (1010) @(posedge CLOCK_50);
@@ -115,21 +115,22 @@ module tb_top_level;
         // Wait for timeout (3 seconds with fast params)
         repeat (3*1000 + 20) @(posedge CLOCK_50);
         check(LEDR[4] == 1'b1, "Timeout LED asserted");
-        check(HEX2 == seven_seg(4'd1), "HEX2 shows timeout flag");
-        check(HEX0 == seven_seg(4'd0), "HEX0 shows zero on timeout");
+        check(HEX5 == seven_seg(4'd0), "HEX5 shows timer tens zero on timeout");
+        check(HEX4 == seven_seg(4'd0), "HEX4 shows timer ones zero on timeout");
 
         // Press KEY2 to reset timer and update last-button indicator
         KEY[2] = 1'b0;
         repeat (1010) @(posedge CLOCK_50);
         check(LEDR[4] == 1'b0, "Timeout cleared by key press");
-        check(HEX1 == seven_seg(4'd2), "HEX1 tracks last button KEY2");
+        check(HEX2 == seven_seg(4'd2), "HEX2 tracks last button KEY2");
 
         KEY[2] = 1'b1;
         repeat (1010) @(posedge CLOCK_50);
 
+        check(HEX0 == seven_seg(4'h0), "HEX0 reserved zero");
+        check(HEX1 == seven_seg(4'h0), "HEX1 reserved zero");
         check(HEX3 == seven_seg(4'h0), "HEX3 reserved zero");
-        check(HEX4 == seven_seg(4'h0), "HEX4 reserved zero");
-        check(HEX5 == seven_seg(4'h0), "HEX5 reserved zero");
+        check(HEX5 == seven_seg(4'h0), "HEX5 timer tens zero");
 
         $display("");
         $display("=== RESULTS: %0d PASSED, %0d FAILED out of %0d tests ===",

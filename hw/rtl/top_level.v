@@ -12,10 +12,9 @@
 //                KEY[1]   = Button 1 (NEXT)
 //                KEY[2]   = Button 2 (BACK)
 //                KEY[3]   = Button 3 (extra)
-//                HEX0     = 15-second idle timer countdown (0-F)
-//                HEX1     = Last button pressed (1-3, F=none)
-//                HEX2     = Timeout flag (0=running, 1=expired)
-//                HEX3-5   = Reserved (show 0)
+//                HEX5:HEX4 = 15-second idle timer countdown (decimal)
+//                HEX2      = Last button pressed (1-3, F=none)
+//                HEX0/1/3  = Reserved (show 0)
 //                LEDR[3:0] = Debounced button levels (active-HIGH)
 //                LEDR[4]   = Timeout flag
 //                LEDR[9:5] = Unused (off)
@@ -33,12 +32,12 @@ module top_level (
     input  wire [3:0]  KEY,           // KEY[0]=reset, KEY[1-3]=buttons
 
     // ---- 7-Segment Displays (active-LOW) ----
-    output wire [6:0]  HEX0,          // Timer countdown
-    output wire [6:0]  HEX1,          // Last button pressed
-    output wire [6:0]  HEX2,          // Timeout flag
+    output wire [6:0]  HEX0,          // Reserved
+    output wire [6:0]  HEX1,          // Reserved
+    output wire [6:0]  HEX2,          // Last button pressed
     output wire [6:0]  HEX3,          // Reserved
-    output wire [6:0]  HEX4,          // Reserved
-    output wire [6:0]  HEX5,          // Reserved
+    output wire [6:0]  HEX4,          // Timer ones digit
+    output wire [6:0]  HEX5,          // Timer tens digit
 
     // ---- LEDs (active-HIGH) ----
     output wire [9:0]  LEDR           // Debounced buttons + timeout indicator
@@ -50,7 +49,7 @@ module top_level (
     wire [3:0] btn_pulse;             // Single-cycle press events (20ns pulses)
     wire [3:0] btn_debounced;         // Stable active-HIGH debounced button levels
     wire       timeout_flag;          // HIGH when 15-second idle timer expires
-    wire [3:0] seconds_remaining;     // BCD countdown value for HEX0 display
+    wire [3:0] seconds_remaining;     // Countdown value shown as decimal on HEX5:HEX4
 
     // ----------------------------------------------------------------
     // fpga_msg_controller: debouncer + edge detect + idle timer + HEX

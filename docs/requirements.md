@@ -19,10 +19,10 @@ R3. Idle timer shall count down from TIMEOUT_SEC to zero.
 - Any button pulse shall reset timer and clear timeout.
 
 R4. HEX display outputs shall encode values in active-LOW 7-segment format.
-- HEX0: seconds remaining.
-- HEX1: last button pressed (F means none after reset).
-- HEX2: timeout status (0 running, 1 expired).
-- HEX3-HEX5: fixed zero.
+- HEX5: timer tens digit.
+- HEX4: timer ones digit.
+- HEX2: last button pressed (F means none after reset).
+- HEX0, HEX1, HEX3: fixed zero.
 
 R5. Standalone top-level wiring shall be consistent.
 - LEDR[3:0] mirrors debounced button levels.
