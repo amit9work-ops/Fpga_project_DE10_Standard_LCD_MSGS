@@ -1,4 +1,4 @@
-# DE10-Standard LCD Message System V2
+# DE10-Standard LCD Message System
 
 This project implements an updated message display system for the Terasic DE10-Standard FPGA board. It migrates critical system control logic (button debouncing, edge detection, and idle timing) from the HPS software to the FPGA fabric for improved responsiveness and robustness.
 
