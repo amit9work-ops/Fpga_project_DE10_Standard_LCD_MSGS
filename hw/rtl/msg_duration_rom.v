@@ -25,15 +25,15 @@ module msg_duration_rom #(
         case (msg_index)
             5'd0:  duration_sec = 6'd12; // Amit Damari / Ido Zylberman (welcome)
             5'd1:  duration_sec = 6'd10; // Eytan Mann / Project 3420
-            5'd2:  duration_sec = 6'd8;  // TAU / University / Tel Aviv
-            5'd3:  duration_sec = 6'd15; // Exercise 1 of 5 - Breathe Out Slowly
-            5'd4:  duration_sec = 6'd15; // Exercise 2 of 5 - Deep Breath In, Count to 10
-            5'd5:  duration_sec = 6'd20; // Exercise 3 of 5 - Raise Arms, Hold 10 Seconds
-            5'd6:  duration_sec = 6'd20; // Exercise 4 of 5 - Lower Arms, Rest and Relax
-            5'd7:  duration_sec = 6'd25; // REST TIME - Take a Break, Drink Water
-            5'd8:  duration_sec = 6'd10; // Please Wait - Therapist Will Be With You
-            5'd9:  duration_sec = 6'd10; // Your Turn Soon
-            5'd10: duration_sec = 6'd12; // IMPORTANT - Press Button If You Need Help
+            5'd2:  duration_sec = 6'd8;  // TAU / Tel Aviv / University
+            5'd3:  duration_sec = 6'd8;  // Exercise 1 of 4 - Breathe In Deep, Hold 8 Seconds
+            5'd4:  duration_sec = 6'd10; // Exercise 2 of 4 - Breathe Out Now, Slow and Steady
+            5'd5:  duration_sec = 6'd10; // Exercise 3 of 4 - Raise Both Arms, Hold 10 Seconds
+            5'd6:  duration_sec = 6'd10; // Exercise 4 of 4 - Lower Arms Down, Relax and Rest
+            5'd7:  duration_sec = 6'd15; // REST TIME - Take a Break, Drink Water
+            5'd8:  duration_sec = 6'd10; // Please Wait - Therapist Is On the Way
+            5'd9:  duration_sec = 6'd10; // Your Turn Soon - Stay Seated, We Will Call
+            5'd10: duration_sec = 6'd12; // IMPORTANT - Need Help Now, Press Any Key
             5'd11: duration_sec = 6'd12; // Do Not Leave - Stay In Room Until Called
             5'd12: duration_sec = 6'd10; // Session Paused - Please Wait, Will Resume
             5'd13: duration_sec = 6'd10; // Session Active - In Progress, Do Not Disturb

@@ -27,7 +27,7 @@ static const char* MSG_LIST[18][4] = {
     {" Exercise 1 of 4",     // Message 3
      "                ",
      " Breathe In Deep",
-     " Hold 4 Seconds "},
+     " Hold 8 Seconds "},
 
     {" Exercise 2 of 4",     // Message 4
      "                ",
