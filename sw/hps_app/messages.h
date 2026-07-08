@@ -3,102 +3,104 @@
 
 // 18 Messages for Rehabilitation/Treatment Room Display
 // Navigate with: KEY1 (Next), KEY2 (Previous), KEY0 (Back)
+// Each line is exactly 16 characters (16x4 char LCD).
 static const char* MSG_LIST[18][4] = {
-    
+
     // === WELCOME / STATUS ===
-    {" Amit Damari ",        // Message 0: Welcome
+    {" Amit Damari    ",     // Message 0: Welcome
      "                ",
      " Ido Zylberman  ",
-     " today is 6 8 26"},   // ✅ Fixed: removed extra "},
-    
+     " 8 August 2026  "},
+
     {" Eytan Mann     ",     // Message 1: Session begins
      "                ",
      " Project 3420   ",
      " Best Project   "},
-    
+
+    // === UNIVERSITY ===
+    {"      TAU       ",     // Message 2
+     "                ",
+     " Tel Aviv       ",
+     " University     "},
+
     // === BREATHING EXERCISES ===
-    {" TAU            ",     // Message 2
+    {" Exercise 1 of 4",     // Message 3
      "                ",
-     " University     ",
-     " Tel Aviv       "},
-    
-    {" Exercise 1 of 5",     // Message 3 - changed "/" to "of"
+     " Breathe In Deep",
+     " Hold 4 Seconds "},
+
+    {" Exercise 2 of 4",     // Message 4
      "                ",
-     " Breathe Out    ",
-     " Slowly Calmly  "},    // changed "&" to word
-    
-    {" Exercise 2 of 5",     // Message 4
-     "                ",
-     " Deep Breath In ",
-     " Count to 10    "},
-    
+     " Breathe Out Now",
+     " Slow and Steady"},
+
     // === PHYSICAL EXERCISES ===
-    {" Exercise 3 of 5",     // Message 5
+    {" Exercise 3 of 4",     // Message 5
      "                ",
-     " Raise Arms Up  ",
+     " Raise Both Arms",
      " Hold 10 Seconds"},
-    
-    {" Exercise 4 of 5",     // Message 6
+
+    {" Exercise 4 of 4",     // Message 6
      "                ",
      " Lower Arms Down",
-     " Rest and Relax "},
-    
+     " Relax and Rest "},
+
     // === REST / BREAK ===
     {"    REST TIME   ",     // Message 7
      "                ",
      " Take a Break   ",
      " Drink Water    "},
-    
+
     // === WAITING MESSAGES ===
     {" Please Wait    ",     // Message 8
      "                ",
-     " Therapist Will ",
-     " Be With You    "},
-    
+     " Therapist Is   ",
+     " On the Way     "},
+
     {" Your Turn Soon ",     // Message 9
      "                ",
      " Stay Seated    ",
-     " We Call You    "},
-    
+     " We Will Call   "},
+
     // === INSTRUCTIONS ===
     {"  IMPORTANT     ",     // Message 10
      "                ",
-     " Press Button   ",
-     " If You Need Help"},
-    
+     " Need Help Now  ",
+     " Press Any Key  "},
+
     {" Do Not Leave   ",     // Message 11
      "                ",
      " Stay In Room   ",
      " Until Called   "},
-    
+
     // === STATUS MESSAGES ===
     {" Session Paused ",     // Message 12
      "                ",
      " Please Wait    ",
      " Will Resume    "},
-    
+
     {" Session Active ",     // Message 13
      "                ",
      " In Progress    ",
      " Do Not Disturb "},
-    
+
     // === COMPLETION ===
-    {" Well Done      ",     // Message 14 - removed "!"
+    {" Well Done      ",     // Message 14
      "                ",
      " Exercise Set   ",
-     " Completed      "},    // removed "!"
-    
+     " Completed      "},
+
     {" Session Done   ",     // Message 15
      "                ",
      " Please Wait    ",
      " For Discharge  "},
-    
+
     // === EMERGENCY / ALERTS ===
     {" ATTENTION      ",     // Message 16
      "                ",
      " Staff Called   ",
      " Help Coming    "},
-    
+
     {" System Ready   ",     // Message 17
      "                ",
      " Press Any Key  ",
