@@ -208,9 +208,14 @@ module fpga_msg_controller #(
     assign timer_tens_digit = seconds_remaining / 10;
     assign timer_ones_digit = seconds_remaining % 10;
 
+    // Current message number (0-17), shown only while a message is
+    // actually displayed; reads 00 in HOME/IDLE/SLEEP.
+    wire [3:0] msg_tens_digit = (fsm_state == FSM_S_MSG) ? (fsm_msg_index / 10) : 4'h0;
+    wire [3:0] msg_ones_digit = (fsm_state == FSM_S_MSG) ? (fsm_msg_index % 10) : 4'h0;
+
     hex_display u_hex (
-        .digit0 (4'h0),                     // HEX0: reserved
-        .digit1 (4'h0),                     // HEX1: reserved
+        .digit0 (msg_ones_digit),           // HEX0: message number, ones digit
+        .digit1 (msg_tens_digit),           // HEX1: message number, tens digit
         .digit2 (last_btn_display),         // HEX2: last button (F=none)
         .digit3 (4'h0),                     // HEX3: reserved
         .digit4 (timer_ones_digit),         // HEX4: timer ones digit

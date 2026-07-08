@@ -232,7 +232,10 @@ module DE10_Standard_GHRD(
   wire [6:0]  hex0_out, hex1_out, hex2_out, hex3_out, hex4_out, hex5_out;
 
 // connection of internal logics
-  assign LEDR[9:1] = fpga_led_internal;
+  // LEDR[9] repurposed from the HPS led_pio (unused by sw/hps_app/main.c)
+  // to blink on every active-countdown expiry: Home->SLEEP timeout, or
+  // (more frequently) each MSG-state per-message auto-advance.
+  assign LEDR[9:1] = {ctrl_timeout_flag, fpga_led_internal[7:0]};
   assign stm_hw_events    = {{4{1'b0}}, SW, fpga_led_internal, fpga_debounced_buttons};
   assign fpga_clk_50=CLOCK_50;
 
