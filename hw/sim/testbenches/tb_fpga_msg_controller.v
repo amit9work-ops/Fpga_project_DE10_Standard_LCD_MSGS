@@ -34,7 +34,7 @@ module tb_fpga_msg_controller;
     wire [NUM_BUTTONS-1:0] btn_pulse;
     wire [NUM_BUTTONS-1:0] btn_debounced;
     wire                   timeout_flag;
-    wire [3:0]             seconds_remaining;
+    wire [5:0]             seconds_remaining;
     wire [2:0]             fsm_state;
     wire [4:0]             fsm_msg_index;
     wire [6:0]             hex0, hex1, hex2, hex3, hex4, hex5;
@@ -228,7 +228,9 @@ module tb_fpga_msg_controller;
         check_bool(pulse_width_errors == 0, 1'b1, "All pulses are single-cycle width");
 
         // ============================================================
-        // TEST 7: Integrated FSM path (IDLE->HOME->MSG + index + timeout)
+        // TEST 7: Integrated FSM path (IDLE->HOME->MSG + index + duration
+        //          reload + auto-advance slideshow, per msg_duration_rom)
+        //   msg_duration_rom defaults used below: index 0 = 12s, index 1 = 10s
         // ============================================================
         key_in[2] = 1'b0;  // Press KEY2: IDLE -> HOME
         repeat (1010) @(posedge clk);
@@ -240,6 +242,17 @@ module tb_fpga_msg_controller;
         repeat (1010) @(posedge clk);
         check_bool(fsm_state == S_MSG, 1'b1, "FSM HOME->MSG via KEY2");
         check_bool(fsm_msg_index == 5'd0, 1'b1, "FSM index reset to 0 on MSG entry");
+
+        // Reload-timing check: entering MSG at index 0 should load the
+        // timer with msg_duration_rom[0] (12s). At these fast-sim
+        // debounce settings, debounce/reload lands almost immediately on
+        // the press, so the ~1010-cycle settle window itself amounts to
+        // just over one full "second" tick — one decrement (12->11) is
+        // expected and confirms a correct reload to 12, not a stale or
+        // wrong value (e.g. the global TIMEOUT_SEC=3 would already read 0).
+        repeat (3) @(posedge clk);
+        check_bool(seconds_remaining == 6'd11, 1'b1, "Timer loaded msg0 duration");
+
         key_in[2] = 1'b1;
         repeat (1010) @(posedge clk);
 
@@ -247,11 +260,35 @@ module tb_fpga_msg_controller;
         repeat (1010) @(posedge clk);
         check_bool(fsm_state == S_MSG, 1'b1, "FSM stays in MSG on KEY1 next");
         check_bool(fsm_msg_index == 5'd1, 1'b1, "FSM index increments in MSG");
+
+        // Reload-timing check (highest-risk behavior): navigating to a new
+        // message must reload the timer with THAT message's own duration
+        // (msg_duration_rom[1] = 10s), not the previous message's (12s).
+        // As above, the ~1010-cycle settle window amounts to just over one
+        // second, so one decrement (10->9) is expected — clearly distinct
+        // from what a stuck-on-msg0 bug would show (~11, from base 12).
+        repeat (3) @(posedge clk);
+        check_bool(seconds_remaining == 6'd9, 1'b1, "Timer reloaded msg1 duration");
+
         key_in[1] = 1'b1;
         repeat (1010) @(posedge clk);
 
-        repeat (3*CLK_FREQ_HZ + 20) @(posedge clk); // timeout in MSG -> SLEEP
-        check_bool(fsm_state == S_SLEEP, 1'b1, "FSM MSG->SLEEP on timeout");
+        // Wait the remainder of msg1's duration (10s) + margin: MSG
+        // auto-advances to the next message and stays in S_MSG (no sleep).
+        repeat (10*CLK_FREQ_HZ + 20) @(posedge clk);
+        check_bool(fsm_state == S_MSG, 1'b1, "FSM stays in MSG, auto-advance");
+        check_bool(fsm_msg_index == 5'd2, 1'b1, "FSM index auto-advances to 2");
+
+        // Return to HOME and confirm HOME's own inactivity timeout (fixed
+        // TIMEOUT_SEC, not a message duration) still reaches SLEEP.
+        key_in[0] = 1'b0;  // Press KEY0: MSG -> HOME
+        repeat (1010) @(posedge clk);
+        check_bool(fsm_state == S_HOME, 1'b1, "FSM MSG->HOME via KEY0");
+        key_in[0] = 1'b1;
+        repeat (1010) @(posedge clk);
+
+        repeat (TIMEOUT_SEC*CLK_FREQ_HZ + 20) @(posedge clk); // HOME timeout -> SLEEP
+        check_bool(fsm_state == S_SLEEP, 1'b1, "FSM HOME->SLEEP on timeout");
 
         // ============================================================
         // Summary

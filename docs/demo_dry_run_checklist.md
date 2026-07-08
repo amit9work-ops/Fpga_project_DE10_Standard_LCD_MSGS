@@ -35,15 +35,16 @@ $env:STRICT_SIM = "1"
 3. Press any key and confirm transition from IDLE to HOME.
 4. Enter message mode and verify KEY1/KEY2 navigation.
 5. Verify KEY0 back navigation.
-6. Wait for timeout and confirm SLEEP behavior.
-7. Wake from SLEEP with any key and confirm return path.
+6. In message mode, do not press any key and confirm each message auto-advances to the next after its own configured duration (`hw/rtl/msg_duration_rom.v`) — the system should keep slideshowing, not sleep.
+7. Press KEY0 to return to HOME, then wait for HOME's inactivity timeout (60s default) and confirm SLEEP behavior.
+8. Wake from SLEEP with any key and confirm return path.
 
 ## Pass/Fail Criteria
 
 1. No stuck states.
 2. No contradictory LCD content/state transitions.
-3. Timeout behavior consistent with FSM state and timer status.
-4. Navigation wrap-around behaves as expected.
+3. HOME timeout consistent with FSM state and timer status (SLEEP); MSG timeout auto-advances instead of sleeping.
+4. Navigation wrap-around behaves as expected, both for manual next/prev and for timeout-driven auto-advance.
 5. Latency evidence collected if required by presentation claim.
 
 ## Required Artifacts

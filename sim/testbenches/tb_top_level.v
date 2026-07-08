@@ -39,9 +39,13 @@ module tb_top_level;
     );
 
     // Fast simulation overrides for internal controller instance.
+    // TIMEOUT_SEC=13 (rather than a single-digit value) deliberately
+    // exercises the widened seconds_remaining / HEX tens-digit division
+    // logic (13/10=1, 13%10=3) — a single-digit override would never
+    // catch a tens-digit regression.
     defparam dut.u_ctrl.CLK_FREQ_HZ = 1000;
     defparam dut.u_ctrl.DEBOUNCE_MS = 1;
-    defparam dut.u_ctrl.TIMEOUT_SEC = 3;
+    defparam dut.u_ctrl.TIMEOUT_SEC = 13;
 
     function [6:0] seven_seg;
         input [3:0] val;
@@ -99,7 +103,7 @@ module tb_top_level;
         check(LEDR[4] == 1'b0, "Init timeout LED low");
         check(LEDR[3:0] == 4'b0000, "Init debounced LEDs low");
         check(HEX2 == seven_seg(4'hF), "Init HEX2 shows F");
-        check(HEX5 == seven_seg(4'h0), "Init HEX5 shows timer tens");
+        check(HEX5 == seven_seg(4'd1), "Init HEX5 shows timer tens");
         check(HEX4 == seven_seg(4'd3), "Init HEX4 shows timer ones");
 
         // Press KEY1 (bit1)
@@ -112,8 +116,10 @@ module tb_top_level;
         repeat (1010) @(posedge CLOCK_50);
         check(LEDR[1] == 1'b0, "KEY1 release reflected on LEDR[1]");
 
-        // Wait for timeout (3 seconds with fast params)
-        repeat (3*1000 + 20) @(posedge CLOCK_50);
+        // Wait for timeout (TIMEOUT_SEC seconds with fast params — this
+        // margin is a safe upper bound regardless of the exact remaining
+        // countdown value at this point)
+        repeat (13*1000 + 20) @(posedge CLOCK_50);
         check(LEDR[4] == 1'b1, "Timeout LED asserted");
         check(HEX5 == seven_seg(4'd0), "HEX5 shows timer tens zero on timeout");
         check(HEX4 == seven_seg(4'd0), "HEX4 shows timer ones zero on timeout");
@@ -130,7 +136,7 @@ module tb_top_level;
         check(HEX0 == seven_seg(4'h0), "HEX0 reserved zero");
         check(HEX1 == seven_seg(4'h0), "HEX1 reserved zero");
         check(HEX3 == seven_seg(4'h0), "HEX3 reserved zero");
-        check(HEX5 == seven_seg(4'h0), "HEX5 timer tens zero");
+        check(HEX5 == seven_seg(4'd1), "HEX5 timer tens digit");
 
         $display("");
         $display("=== RESULTS: %0d PASSED, %0d FAILED out of %0d tests ===",

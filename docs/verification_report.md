@@ -9,11 +9,11 @@ This report maps requirements to simulations and records expected evidence for s
 |---|---|---|
 | R1 Debounce behavior | hw/sim/testbenches/tb_button_debouncer.v | Clean press/release acceptance and bounce rejection pass |
 | R2 Single pulse per press | hw/sim/testbenches/tb_button_edge_detector.v | Rising-edge pulse only, no re-trigger while held |
-| R3 Idle timeout behavior | hw/sim/testbenches/tb_idle_timer.v | Exact countdown and timeout/reset behavior pass |
+| R3a/R3b Idle/per-message timeout behavior | hw/sim/testbenches/tb_idle_timer.v | Exact countdown, runtime load_value reload, and timeout/reset behavior pass |
 | R4 HEX exact encoding | hw/sim/testbenches/tb_hex_display.v | Exhaustive 0-F exact segment mapping pass |
-| R3+R4 Integrated behavior | hw/sim/testbenches/tb_fpga_msg_controller.v | Exact pulse-width and exact HEX checks pass |
-| R7 Verilog UI FSM behavior | hw/sim/testbenches/tb_message_fsm.v | INIT/IDLE/HOME/MSG/SLEEP transitions, timeout priority, and message index wrap-around pass |
-| R6 SoC register contract (FSM export) | hw/sim/testbenches/tb_soc_register_contract.v | fsm_status[7:5]=state and fsm_status[4:0]=msg_index mapping pass |
+| R3a+R3b+R4 Integrated behavior | hw/sim/testbenches/tb_fpga_msg_controller.v | Exact pulse-width, exact HEX checks, HOME timeout->SLEEP, and MSG per-message duration reload/auto-advance pass |
+| R7 Verilog UI FSM behavior | hw/sim/testbenches/tb_message_fsm.v | INIT/IDLE/HOME/MSG/SLEEP transitions, button-priority-over-timeout, MSG auto-advance-with-wrap, and message index wrap-around pass |
+| R6 SoC register contract (FSM+timer export) | hw/sim/testbenches/tb_soc_register_contract.v | fsm_status[7:5]=state, fsm_status[4:0]=msg_index, and timer_status[6:1]=seconds (0-63) mapping pass |
 | R5 Top-level wiring | sim/testbenches/tb_top_level.v | LED/HEX wiring and timeout behavior pass |
 | V3 Clock utility quality | sim/testbenches/tb_clock_divider.v | 1s tick observed; strict count and pulse-width checks pass |
 | V4 Regression execution | sim/run_all_sim.ps1 | Single summary reports all suites passed |

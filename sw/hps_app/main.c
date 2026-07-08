@@ -32,7 +32,10 @@
 #define FSM_STATUS_PIO_BASE   0x0110
 #define TIMER_STATUS_PIO_BASE 0x0100
 #define BUTTON_MASK           0x0F
-#define TIMEOUT_SECONDS       15
+#define TIMEOUT_SECONDS       60  // documentation only — actual Home/idle
+                                   // timeout enforced in FPGA (idle_timer.v);
+                                   // MSG state uses per-message durations from
+                                   // msg_duration_rom.v instead. Not read here.
 
 #define FSM_STATUS_STATE_SHIFT 5
 #define FSM_STATUS_STATE_MASK  0xE0
@@ -241,7 +244,7 @@ int main(void) {
         int  hw_fsm_state = FSM_STATE_FROM_REG(fsm_status);
         int  hw_msg_index = FSM_INDEX_FROM_REG(fsm_status);
         bool timeout      = timer_status & 1;
-        int  secs_left    = (timer_status >> 1) & 0x0F;
+        int  secs_left    = (timer_status >> 1) & 0x3F;  // bits[6:1], 0-63 (0-15 pre-widening)
 
         // FIXED: only warn on persistent inconsistency (not on transitions).
         // We require the inconsistency to coincide with a state change,

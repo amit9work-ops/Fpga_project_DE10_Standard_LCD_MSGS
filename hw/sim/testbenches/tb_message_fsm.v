@@ -102,9 +102,9 @@ module tb_message_fsm;
                 end
 
                 S_MSG: begin
-                    if (in_timeout)
-                        out_state = S_SLEEP;
-                    else if (in_btn[0])
+                    // Buttons take priority; timeout auto-advances (wraps)
+                    // and stays in S_MSG (slideshow), never goes to SLEEP.
+                    if (in_btn[0])
                         out_state = S_HOME;
                     else if (in_btn[1]) begin
                         if (in_index == (MSG_COUNT - 1))
@@ -116,6 +116,11 @@ module tb_message_fsm;
                             out_index = MSG_COUNT - 1;
                         else
                             out_index = in_index - 1'b1;
+                    end else if (in_timeout) begin
+                        if (in_index == (MSG_COUNT - 1))
+                            out_index = {INDEX_W{1'b0}};
+                        else
+                            out_index = in_index + 1'b1;
                     end
                 end
 
@@ -198,18 +203,39 @@ module tb_message_fsm;
         pulse_btn(2);
         check_eq(state == S_IDLE, "SLEEP -> IDLE on any key");
 
-        // Enter MSG again to test timeout priority over key activity
+        // Enter MSG again to test auto-advance-on-timeout behavior
         pulse_btn(1);
         pulse_btn(1);
-        check_eq(state == S_MSG, "Back in MSG for timeout-priority test");
+        check_eq(state == S_MSG, "Back in MSG, auto-adv test");
+        check_eq(msg_index == 0, "MSG re-entry starts at index 0");
 
+        // Timeout alone (no button) auto-advances to next message, wraps,
+        // and stays in S_MSG (does NOT go to SLEEP).
         timeout_flag = 1'b1;
-        btn_pulse = 4'b0010; // KEY1 simultaneously
         @(posedge clk);
         timeout_flag = 1'b0;
-        btn_pulse = 4'b0000;
         @(posedge clk);
-        check_eq(state == S_SLEEP, "Timeout has priority in MSG");
+        check_eq(state == S_MSG, "MSG stays on timeout, no sleep");
+        check_eq(msg_index == 1, "MSG index +1 on timeout");
+
+        // Holding timeout_flag for multiple cycles (no button) advances
+        // once per cycle it's asserted — this module trusts its caller to
+        // present timeout_flag as a single-cycle pulse; documented here so
+        // the contract is exercised and visible in the regression.
+        timeout_flag = 1'b1;
+        repeat (3) @(posedge clk);
+        timeout_flag = 1'b0;
+        @(posedge clk);
+        check_eq(msg_index == 4, "Held timeout advances per cycle");
+
+        // Button beats a simultaneous timeout (manual override priority)
+        btn_pulse = 4'b0001; // KEY0
+        timeout_flag = 1'b1; // simultaneous timeout
+        @(posedge clk);
+        btn_pulse = 4'b0000;
+        timeout_flag = 1'b0;
+        @(posedge clk);
+        check_eq(state == S_HOME, "Button beats timeout in MSG");
 
         // Home timeout priority test
         pulse_btn(0); // wake to IDLE

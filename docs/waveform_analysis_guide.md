@@ -66,7 +66,8 @@ If `gtkwave` is not in PATH, provide the executable path:
 Critical scenarios to inspect in GTKWave:
 - Wake path: `btn_pulse` while `fsm_state=SLEEP` causes `fsm_state -> IDLE` and timeout clear.
 - Navigation path: `IDLE -> HOME -> MSG` via KEY pulses, with `fsm_msg_index` behavior in MSG.
-- Timeout path: `seconds_remaining` countdown reaches 0, `timeout_flag` asserts, FSM transitions to SLEEP.
+- Home timeout path: `seconds_remaining` counts down from TIMEOUT_SEC (60s default) to 0 in HOME, `timeout_flag` asserts, FSM transitions to SLEEP.
+- MSG auto-advance path: `seconds_remaining` counts down from the current message's duration (`msg_duration_rom.v`, indexed by `fsm_msg_index`) to 0, `timeout_flag` pulses, `fsm_msg_index` auto-advances (wrap), FSM stays in MSG (does NOT sleep). Confirm a freshly-entered message reloads with its OWN duration, not the previous message's.
 
 ## Manual Visual Inspection (Optional)
 For focused debugging, inspect these signals in `tb_fpga_msg_controller.vcd`:
@@ -74,7 +75,7 @@ For focused debugging, inspect these signals in `tb_fpga_msg_controller.vcd`:
 - `key_in[3:0]`
 - `btn_debounced[3:0]`
 - `btn_pulse[3:0]`
-- `seconds_remaining[3:0]`
+- `seconds_remaining[5:0]`
 - `timeout_flag`
 - `fsm_state[2:0]`
 - `fsm_msg_index[4:0]`
@@ -82,5 +83,5 @@ For focused debugging, inspect these signals in `tb_fpga_msg_controller.vcd`:
 Expected timing behavior:
 - Debounced button transitions occur only after debounce window is satisfied.
 - `btn_pulse` is exactly one cycle per accepted press.
-- Timeout drives HOME/MSG to SLEEP.
+- Timeout in HOME drives SLEEP; timeout in MSG auto-advances to the next message (wrap) instead and stays in MSG.
 - Any valid button pulse while sleeping returns FSM to IDLE.

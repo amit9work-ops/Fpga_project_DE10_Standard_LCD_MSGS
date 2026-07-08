@@ -226,7 +226,7 @@ module DE10_Standard_GHRD(
   wire [3:0]  ctrl_btn_pulse;          // Single-cycle button press events
   wire [3:0]  ctrl_btn_debounced;      // Debounced button levels (active-HIGH)
   wire        ctrl_timeout_flag;       // Idle timer expired
-  wire [3:0]  ctrl_seconds_remaining;  // BCD countdown for display
+  wire [5:0]  ctrl_seconds_remaining;  // Countdown for display (0-63)
   wire [2:0]  ctrl_fsm_state;          // Verilog UI FSM state
   wire [4:0]  ctrl_fsm_msg_index;      // Verilog UI FSM message index
   wire [6:0]  hex0_out, hex1_out, hex2_out, hex3_out, hex4_out, hex5_out;
@@ -348,7 +348,8 @@ soc_system u0 (
       // fsm_status_pio [7:5]=FSM state, [4:0]=FSM message index
       // Debounced levels remain available via button_pio @ 0x5000.
       .fsm_status_pio_external_connection_export   ({ctrl_fsm_state, ctrl_fsm_msg_index}), // 8-bit @ 0x6000
-		  .timer_status_pio_external_connection_export  ({3'b0, ctrl_seconds_remaining, ctrl_timeout_flag}), // 8-bit @ 0x7000
+		  // timer_status_pio: [7]=reserved, [6:1]=seconds_remaining(0-63), [0]=timeout_flag
+		  .timer_status_pio_external_connection_export  ({1'b0, ctrl_seconds_remaining, ctrl_timeout_flag}), // 8-bit @ 0x7000
 		  .hps_0_h2f_reset_reset_n               ( hps_fpga_reset_n ),                //                hps_0_h2f_reset.reset_n
 		  .hps_0_f2h_cold_reset_req_reset_n      (~hps_cold_reset ),      //       hps_0_f2h_cold_reset_req.reset_n
 		  .hps_0_f2h_debug_reset_req_reset_n     (~hps_debug_reset ),     //      hps_0_f2h_debug_reset_req.reset_n
@@ -443,7 +444,7 @@ assign LEDR[0]=led_level;
 assign GPIO[0] = ~KEY[0];                // KEY0: raw active-HIGH input before debouncer
 assign GPIO[1] = ctrl_btn_debounced[0];  // KEY0: stable active-HIGH level after debouncer
 assign GPIO[2] = btn0_stretched;         // KEY0 press: 20ms pulse (clearly visible on scope)
-assign GPIO[3] = ctrl_timeout_flag;      // HIGH after 15s idle, resets on any button press
+assign GPIO[3] = ctrl_timeout_flag;      // HIGH when active countdown expires (Home: 60s idle; MSG: current message's duration — see msg_duration_rom.v)
 assign GPIO[4] = counter[23];            // ~3 Hz square wave, always running
 assign GPIO[5] = counter[25];            // ~0.75 Hz square wave, always running
 assign GPIO[6] = ctrl_fsm_state[1];      // FSM state bit 1
@@ -456,7 +457,7 @@ assign GPIO[7] = ctrl_fsm_state[0];      // FSM state bit 0 — bits [7:6]: 00=I
 fpga_msg_controller #(
     .CLK_FREQ_HZ (50_000_000),
     .DEBOUNCE_MS (20),
-    .TIMEOUT_SEC (15),
+    .TIMEOUT_SEC (60),
     .NUM_BUTTONS (4)
 ) u_msg_ctrl (
     .clk               (fpga_clk_50),

@@ -9,7 +9,7 @@ static const char* MSG_LIST[18][4] = {
     {" Amit Damari ",        // Message 0: Welcome
      "                ",
      " Ido Zylberman  ",
-     " today is 17 2 25"},   // ✅ Fixed: removed extra "},
+     " today is 6 8 26"},   // ✅ Fixed: removed extra "},
     
     {" Eytan Mann     ",     // Message 1: Session begins
      "                ",

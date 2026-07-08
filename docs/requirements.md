@@ -13,10 +13,15 @@ R1. Buttons shall be debounced in FPGA fabric.
 R2. A button press shall generate exactly one pulse event per rising edge of debounced state.
 - Holding a button shall not generate repeated pulses.
 
-R3. Idle timer shall count down from TIMEOUT_SEC to zero.
-- Default timeout: 15 seconds.
-- Timer shall assert timeout when countdown reaches zero.
-- Any button pulse shall reset timer and clear timeout.
+R3a. Home/idle inactivity timer shall count down from TIMEOUT_SEC to zero, applying to S_HOME (and S_IDLE) only.
+- Default timeout: 60 seconds.
+- Timer shall assert timeout when countdown reaches zero, transitioning HOME to SLEEP.
+- Any button pulse shall reload and restart the timer, clearing timeout.
+
+R3b. Message-mode (S_MSG) shall use a per-message duration instead of the Home timeout.
+- Each message has its own display duration in seconds, defined in `hw/rtl/msg_duration_rom.v` (indexed the same way as `sw/hps_app/messages.h`).
+- When the current message's duration elapses, the system shall auto-advance to the next message (wrap-around at MSG_COUNT) and remain in S_MSG — it shall NOT transition to SLEEP.
+- Button presses (next/prev/back) take priority over an auto-advance that would occur on the same cycle, and reload the timer with the newly-shown message's own duration.
 
 R4. HEX display outputs shall encode values in active-LOW 7-segment format.
 - HEX5: timer tens digit.
@@ -31,12 +36,12 @@ R5. Standalone top-level wiring shall be consistent.
 
 R6. HPS-visible register packing in SoC integration shall be stable.
 - FSM status export: bits[7:5] shall expose FSM state and bits[4:0] shall expose FSM message index.
-- Timer status export: bit0 timeout flag, bits[4:1] seconds remaining.
+- Timer status export: bit0 timeout flag, bits[6:1] seconds remaining (0-63), bit7 reserved.
 
 R7. Core UI control FSM shall be implemented in Verilog.
 - Required states: INIT, IDLE, HOME, MSG, SLEEP.
-- Required transitions: button-driven navigation and timeout-driven sleep path.
-- Message index navigation in MSG state shall support wrap-around for next/previous actions.
+- Required transitions: button-driven navigation; HOME's timeout is sleep-driven; MSG's timeout is auto-advance-driven (not sleep).
+- Message index navigation in MSG state shall support wrap-around for next/previous actions and for timeout-driven auto-advance.
 
 ## Verification Requirements
 

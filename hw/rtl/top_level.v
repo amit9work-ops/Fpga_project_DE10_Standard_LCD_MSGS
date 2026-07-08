@@ -12,7 +12,9 @@
 //                KEY[1]   = Button 1 (NEXT)
 //                KEY[2]   = Button 2 (BACK)
 //                KEY[3]   = Button 3 (extra)
-//                HEX5:HEX4 = 15-second idle timer countdown (decimal)
+//                HEX5:HEX4 = countdown (decimal): Home/idle inactivity timer
+//                            (60s default) while HOME/IDLE, or the current
+//                            message's own duration while in MSG (slideshow)
 //                HEX2      = Last button pressed (1-3, F=none)
 //                HEX0/1/3  = Reserved (show 0)
 //                LEDR[3:0] = Debounced button levels (active-HIGH)
@@ -48,8 +50,8 @@ module top_level (
     // ----------------------------------------------------------------
     wire [3:0] btn_pulse;             // Single-cycle press events (20ns pulses)
     wire [3:0] btn_debounced;         // Stable active-HIGH debounced button levels
-    wire       timeout_flag;          // HIGH when 15-second idle timer expires
-    wire [3:0] seconds_remaining;     // Countdown value shown as decimal on HEX5:HEX4
+    wire       timeout_flag;          // HIGH when the active countdown expires
+    wire [5:0] seconds_remaining;     // Countdown value shown as decimal on HEX5:HEX4
 
     // ----------------------------------------------------------------
     // fpga_msg_controller: debouncer + edge detect + idle timer + HEX
@@ -57,7 +59,8 @@ module top_level (
     fpga_msg_controller #(
         .CLK_FREQ_HZ (50_000_000),    // 50 MHz — match CLOCK_50
         .DEBOUNCE_MS (20),             // 20 ms debounce window
-        .TIMEOUT_SEC (15),             // 15-second idle timeout
+        .TIMEOUT_SEC (60),             // Home/idle inactivity timeout (S_MSG
+                                        // uses per-message duration instead)
         .NUM_BUTTONS (4)               // All 4 KEY buttons
     ) u_ctrl (
         .clk               (CLOCK_50),
@@ -82,7 +85,7 @@ module top_level (
     //   LEDR[9:5] — unused, forced off
     // ----------------------------------------------------------------
     assign LEDR[3:0] = btn_debounced;   // Active-HIGH: lit when button pressed
-    assign LEDR[4]   = timeout_flag;    // Lit when system has been idle 15s
+    assign LEDR[4]   = timeout_flag;    // Lit when the active countdown expires
     assign LEDR[9:5] = 5'b00000;
 
 endmodule
