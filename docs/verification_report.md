@@ -14,8 +14,8 @@ This report maps requirements to simulations and records expected evidence for s
 | R3a+R3b+R4 Integrated behavior | hw/sim/testbenches/tb_fpga_msg_controller.v | Exact pulse-width, exact HEX checks, HOME timeout->SLEEP, and MSG per-message duration reload/auto-advance pass |
 | R7 Verilog UI FSM behavior | hw/sim/testbenches/tb_message_fsm.v | INIT/IDLE/HOME/MSG/SLEEP transitions, button-priority-over-timeout, MSG auto-advance-with-wrap, and message index wrap-around pass |
 | R6 SoC register contract (FSM+timer export) | hw/sim/testbenches/tb_soc_register_contract.v | fsm_status[7:5]=state, fsm_status[4:0]=msg_index, and timer_status[6:1]=seconds (0-63) mapping pass |
-| R5 Top-level wiring | sim/testbenches/tb_top_level.v | LED/HEX wiring and timeout behavior pass |
-| V3 Clock utility quality | sim/testbenches/tb_clock_divider.v | 1s tick observed; strict count and pulse-width checks pass |
+| R5 Top-level wiring | sim/testbenches_legacy/tb_top_level.v | LED/HEX wiring and timeout behavior pass |
+| V3 Clock utility quality | sim/testbenches_legacy/tb_clock_divider.v | 1s tick observed; strict count and pulse-width checks pass |
 | V4 Regression execution | sim/run_all_sim.ps1 | Single summary reports all suites passed |
 | Waveform structural checks | sim/run_wave_analysis.ps1 | Auto-generated report verifies pulse width, timeout edge, and FSM state coverage from VCD |
 | Quartus 21.1 Questa regression | sim/run_quartus_questa_sim.ps1 | Canonical suites run under Quartus-bundled Questa with transcript log |
@@ -49,7 +49,7 @@ This report maps requirements to simulations and records expected evidence for s
 
 | Item | Source Artifact | Status | Notes |
 |---|---|---|---|
-| Debounce window correctness | hw/rtl/button_debouncer.v + hw/sim/testbenches/tb_button_debouncer.v | Closed (simulation) | Parameterized 50 ms behavior validated in unit simulation. |
+| Debounce window correctness | hw/rtl/button_debouncer.v + hw/sim/testbenches/tb_button_debouncer.v | Closed (simulation) | Parameterized 20 ms behavior (real board default) validated in unit simulation. |
 | Timer countdown correctness | hw/rtl/idle_timer.v + hw/sim/testbenches/tb_idle_timer.v | Closed (simulation) | Deterministic clock-driven countdown behavior validated. |
 | FSM transition correctness | hw/rtl/message_fsm.v + hw/sim/testbenches/tb_message_fsm.v | Closed (simulation) | Directed and deep transition coverage present. |
 | Register contract stability | hw/sim/testbenches/tb_soc_register_contract.v | Closed (simulation) | Packing for FSM/timer status verified. |

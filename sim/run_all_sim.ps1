@@ -55,7 +55,7 @@ New-Item -ItemType Directory -Force -Path $RESULTS | Out-Null
 # --- Path shortcuts ---
 $RTL  = "$ROOT\hw\rtl"
 $TBH  = "$ROOT\hw\sim\testbenches"   # canonical testbenches (correct interfaces)
-$TBS  = "$ROOT\sim\testbenches"      # legacy testbenches (fixed)
+$TBS  = "$ROOT\sim\testbenches_legacy"  # legacy testbenches (fixed)
 
 # --- Tracking ---
 $pass = 0
@@ -202,7 +202,7 @@ $runLegacy = $env:RUN_LEGACY -eq "1"
 if ($runLegacy) {
     Write-Host ""
     Write-Host "###########################################################"
-    Write-Host "#   PHASE 3: LEGACY TESTBENCHES (sim/testbenches/)       #"
+    Write-Host "#   PHASE 3: LEGACY TESTBENCHES (sim/testbenches_legacy/) #"
     Write-Host "###########################################################"
 
     # --- TC-L1: button_debouncer single-channel (legacy) ---

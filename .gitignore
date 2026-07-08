@@ -66,6 +66,14 @@ transcript
 *.bak
 *.orig
 **/.qsys_edit/
+**/greybox_tmp/
+**/output_files/*.rbf
+**/output_files/*.map.smsg
+**/*.ipregen.rpt
+
+# Compiled simulation binaries (extensionless, built by iverilog at repo root)
+/clock_div_sim
+/debouncer_sim
 
 # If hw/output/ is your output directory (not output_files/)
 hw/output/

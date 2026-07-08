@@ -76,7 +76,7 @@ Recommended acceptance:
 1. Raw capture set (scope screenshots or analyzer export, or fallback video references).
 2. `latency_samples.csv` with >=20 samples.
 3. Script output summary (mean, min, max, pass/fail).
-4. Update `docs/presentation_parity_matrix.md` C-006 from `Open` to `Satisfied` with artifact references.
+4. Update `artifacts/presentation_parity_matrix.md` C-006 from `Open` to `Satisfied` with artifact references.
 
 ## Troubleshooting
 

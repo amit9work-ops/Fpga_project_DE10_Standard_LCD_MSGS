@@ -8,7 +8,7 @@ This document defines simulation-first requirements that must pass before FPGA b
 R1. Buttons shall be debounced in FPGA fabric.
 - Input polarity: KEY signals are active-LOW.
 - Output polarity: debounced outputs are active-HIGH.
-- Default debounce window: 50 ms at 50 MHz.
+- Default debounce window: 20 ms at 50 MHz.
 
 R2. A button press shall generate exactly one pulse event per rising edge of debounced state.
 - Holding a button shall not generate repeated pulses.

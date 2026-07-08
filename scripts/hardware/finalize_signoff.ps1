@@ -1,5 +1,5 @@
 param(
-    [string]$ParityMatrixPath = ".\\docs\\presentation_parity_matrix.md",
+    [string]$ParityMatrixPath = ".\\artifacts\\presentation_parity_matrix.md",
     [string]$DemoChecklistPath = ".\\artifacts\\hardware\\demo_checklist_log.md",
     [string]$SignoffReportPath = ".\\artifacts\\hardware\\signoff_report.md",
     [switch]$RunBoardSignoff,
@@ -105,5 +105,5 @@ Set-Content -Path $ParityMatrixPath -Value $updated -Encoding ASCII
 
 Write-Host ""
 Write-Host "Final sign-off complete." -ForegroundColor Green
-Write-Host "Updated: docs/presentation_parity_matrix.md" -ForegroundColor Green
+Write-Host "Updated: artifacts/presentation_parity_matrix.md" -ForegroundColor Green
 exit 0

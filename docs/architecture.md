@@ -9,7 +9,25 @@ The design uses a hybrid SoC partition where FPGA fabric owns real-time control 
 
 This partition keeps timing-critical behavior deterministic in hardware and removes OS scheduling jitter from control transitions.
 
-## 2. Functional Data Flow
+## 2. FSM State Diagram
+
+Implemented in `hw/rtl/message_fsm.v`. Buttons always take priority over a timeout that would occur on the same cycle.
+
+```mermaid
+stateDiagram-v2
+    [*] --> INIT
+    INIT --> IDLE : auto (reset release)
+    IDLE --> HOME : any button
+    HOME --> IDLE : KEY0
+    HOME --> MSG : KEY1 / KEY2
+    HOME --> SLEEP : 60s inactivity timeout
+    MSG --> HOME : KEY0
+    MSG --> MSG : KEY1 next / KEY2 prev (wrap)
+    MSG --> MSG : message duration elapsed\n(auto-advance, wrap)
+    SLEEP --> IDLE : any button
+```
+
+## 3. Functional Data Flow
 
 1. KEY[3:0] inputs (active-LOW) enter `button_debouncer.v` and are synchronized/filtered.
 2. Debounced active-HIGH levels feed `button_edge_detector.v` to produce one-cycle press pulses.
@@ -25,7 +43,7 @@ This partition keeps timing-critical behavior deterministic in hardware and remo
 	- `timer_status_pio`: [7]=reserved, [6:1]=seconds remaining (0-63), [0]=timeout.
 7. HPS app (`main.c`) polls these registers and renders the corresponding LCD frame.
 
-## 3. RTL Modules
+## 4. RTL Modules
 
 - `hw/rtl/button_debouncer.v`: 2-FF synchronizer + stability counter, default 20 ms window.
 - `hw/rtl/button_edge_detector.v`: rising-edge one-shot pulse generation.
@@ -35,7 +53,7 @@ This partition keeps timing-critical behavior deterministic in hardware and remo
 - `hw/rtl/hex_display.v`: active-LOW 7-segment encoder.
 - `hw/rtl/fpga_msg_controller.v`: integration wrapper; selects the timer's `load_value` by FSM state, converts the raw timeout level into a single-cycle pulse for `message_fsm`, and drives the timer's reload strobe (any button press, or an in-MSG auto-advance) so a freshly-shown message always reloads with its own duration.
 
-## 4. SoC Interface Contract
+## 5. SoC Interface Contract
 
 Lightweight H2F bridge base: `0xFF200000`
 
@@ -48,19 +66,19 @@ Contract assumptions:
 - Register packing is stable and verified by simulation contract tests.
 - HPS must decode state/index exactly according to bit assignments above.
 
-## 5. Timing and Ownership Rules
+## 6. Timing and Ownership Rules
 
 - Control transitions must originate in FPGA FSM logic.
 - HPS must not override FSM transitions; it may only render based on observed hardware state.
 - Timer reload source is any button pulse, OR (while in MSG) `msg_index` auto-advancing on timeout. A plain state change with no button press (e.g. HOME's own timeout into SLEEP) must NOT reload the timer.
 
-## 6. Build/Integration Notes
+## 7. Build/Integration Notes
 
 - Platform Designer system is defined in `hw/quartus/soc_system.qsys`.
 - Top-level SoC wiring is in `hw/quartus/DE10_Standard_GHRD.v`.
 - Quartus source inclusion is controlled by `hw/quartus/DE10_Standard_GHRD.qsf`.
 
-## 7. Verification Linkage
+## 8. Verification Linkage
 
 - Functional requirements are defined in `docs/requirements.md`.
 - Requirement-to-test mapping and sign-off evidence live in `docs/verification_report.md`.

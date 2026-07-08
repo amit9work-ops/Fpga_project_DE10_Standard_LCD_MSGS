@@ -1,16 +1,23 @@
 # DE10-Standard LCD Message System
 
-This project implements an updated message display system for the Terasic DE10-Standard FPGA board. It migrates critical system control logic (button debouncing, edge detection, and idle timing) from the HPS software to the FPGA fabric for improved responsiveness and robustness.
+This project implements a message display system for the Terasic DE10-Standard FPGA board, built for a physiotherapy/rehabilitation treatment room. It migrates critical system control logic (button debouncing, edge detection, idle timing, and per-message display duration) from the HPS software to the FPGA fabric for improved responsiveness and robustness.
+
+## Recent Highlights
+
+*   **Per-message auto-advance slideshow**: each message now displays for its own configurable duration (`msg_duration_rom.v`) before automatically advancing to the next — a real hardware-timed slideshow, not just a static screen. Manual KEY1/KEY2/KEY0 navigation always takes priority.
+*   **60-second Home inactivity timeout** (previously 15s): only the Home screen sleeps on inactivity now; the message slideshow keeps cycling on its own instead of sleeping.
+*   **On-board demo indicators**: HEX0/HEX1 now show the active message number, and LEDR[9] blinks on every countdown expiry — both tie the physical board directly to what's happening on the LCD.
 
 ## Project Architecture
 
 The system uses a hybrid FPGA + HPS architecture:
 *   **FPGA Logic**: Handles real-time tasks independently of the OS.
-    *   **50ms Debouncer**: Filters button noise (Schmitt trigger synchronization + counter-based stability check).
+    *   **20ms Debouncer**: Filters button noise (2-FF synchronizer + counter-based stability check).
     *   **Button Edge Detector**: Converts debounced button levels into single-cycle press pulses.
-    *   **Idle Timer**: Maintains a 15-second inactivity timeout countdown.
-    *   **UI FSM (Verilog)**: Implements INIT/IDLE/HOME/MSG/SLEEP states and message index navigation.
-    *   **HEX Display Driver**: Outputs system status (Timer, Last Button, Timeout Flag) to onboard 7-segment displays.
+    *   **Idle Timer**: Runtime-loadable countdown — 60s Home inactivity timeout, or (while a message is shown) that message's own display duration.
+    *   **Message Duration ROM**: Compile-time lookup table giving each of the 18 messages its own display duration in seconds.
+    *   **UI FSM (Verilog)**: Implements INIT/IDLE/HOME/MSG/SLEEP states and message index navigation; MSG auto-advances on timeout instead of sleeping, only HOME sleeps.
+    *   **HEX Display Driver**: Outputs system status (Timer countdown, current message number, last button, timeout flag) to onboard 7-segment displays.
 *   **HPS Software**: Acts as LCD renderer and diagnostics client.
     *   Reads FPGA-exported FSM and timer status registers via LW Bridge.
     *   Renders LCD content based on hardware state and message index.
@@ -19,8 +26,9 @@ The system uses a hybrid FPGA + HPS architecture:
 ### Hardware Components
 *   `button_debouncer.v`: Parameterized debouncer module.
 *   `button_edge_detector.v`: Rising-edge detector for one-pulse-per-press behavior.
-*   `idle_timer.v`: Programmable countdown timer with enable/reset.
-*   `message_fsm.v`: Verilog UI control FSM with timeout path and message index wrap-around.
+*   `idle_timer.v`: Countdown timer with a runtime-loadable starting value, enable/reset.
+*   `msg_duration_rom.v`: Per-message display duration lookup table (hand-edited, same workflow as editing message text).
+*   `message_fsm.v`: Verilog UI control FSM — HOME timeout sleeps, MSG timeout auto-advances (wrap), buttons always take priority.
 *   `hex_display.v`: BCD-to-7-segment decoder.
 *   `fpga_msg_controller.v`: Top-level wrapper integrating all FPGA modules.
 *   `DE10_Standard_GHRD.v`: Top-level system instantiation connecting RTL to HPS via Qsys.
@@ -37,7 +45,7 @@ The HPS communicates with the FPGA via the Lightweight H2F Bridge (Base: 0xFF200
 | :--- | :--- | :--- | :--- | :--- |
 | `button_pio` | `0x5000` | 4-bit | Input | (Original) Raw button inputs. |
 | `fsm_status_pio` | `0x6000` | 8-bit | Input | Bits [7:5]: **FSM State**. Bits [4:0]: **FSM Message Index**. |
-| `timer_status_pio` | `0x7000` | 8-bit | Input | Bit [0]: **Timeout Flag** (1=Expired). Bits [4:1]: **Seconds Remaining** (BCD). |
+| `timer_status_pio` | `0x7000` | 8-bit | Input | Bit [0]: **Timeout Flag** (1=Expired). Bits [6:1]: **Seconds Remaining** (0-63). Bit [7]: reserved. |
 
 ## Simulation Verification (Pre-Hardware)
 

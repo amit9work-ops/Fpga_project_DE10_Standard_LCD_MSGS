@@ -62,7 +62,7 @@ $env:STRICT_SIM = "1"
 
 ## Closure
 
-After successful dry-run, update `docs/presentation_parity_matrix.md`:
+After successful dry-run, update `artifacts/presentation_parity_matrix.md`:
 
 1. Set `C-008` to `Satisfied`.
 2. If latency target is met and evidence is attached, set `C-006` to `Satisfied`.

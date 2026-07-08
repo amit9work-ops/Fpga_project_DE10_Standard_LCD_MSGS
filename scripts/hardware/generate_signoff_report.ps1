@@ -96,7 +96,7 @@ $report += ""
 $report += "## Notes"
 $report += ""
 $report += "- Attach scope/analyzer captures if presentation requires hardware timing proof."
-$report += "- Update docs/presentation_parity_matrix.md (C-006, C-008) when evidence is complete."
+$report += "- Update artifacts/presentation_parity_matrix.md (C-006, C-008) when evidence is complete."
 
 $outDir = Split-Path -Parent $OutPath
 if (-not (Test-Path $outDir)) {

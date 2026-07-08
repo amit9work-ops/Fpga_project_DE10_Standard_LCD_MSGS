@@ -13,7 +13,7 @@ set SCRIPT_DIR [file dirname [file normalize [info script]]]
 set ROOT       [file normalize [file join $SCRIPT_DIR .. ..]]
 set RTL        "$ROOT/hw/rtl"
 set TBH        "$ROOT/hw/sim/testbenches"
-set TBS        "$ROOT/sim/testbenches"
+set TBS        "$ROOT/sim/testbenches_legacy"
 set RESULTS    "$ROOT/sim/results"
 
 file mkdir $RESULTS
@@ -147,7 +147,7 @@ run_tb "tb_top_level" \
 if {[info exists ::env(RUN_LEGACY)] && $::env(RUN_LEGACY) eq "1"} {
     puts ""
     puts "###########################################################"
-    puts "#   PHASE 3: LEGACY TESTS (sim/testbenches/)             #"
+    puts "#   PHASE 3: LEGACY TESTS (sim/testbenches_legacy/)      #"
     puts "###########################################################"
 
     run_tb "tb_button_debouncer_legacy" \
