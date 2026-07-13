@@ -1,6 +1,6 @@
 # Diagram sources
 
-Each `.tex` file here is a standalone, self-contained TikZ diagram — the vector source behind the corresponding PNG in [`docs/images/`](../images/). They were extracted from the project's final report and wrapped in the `standalone` document class so each one compiles independently.
+Each `.tex` file here is a standalone, self-contained TikZ diagram — the vector source behind the corresponding PNG in [`assets/images/`](../images/). They were extracted from the project's final report and wrapped in the `standalone` document class so each one compiles independently.
 
 ## Rebuilding a diagram
 
@@ -23,5 +23,5 @@ Repeat per file, or loop over `*.tex` in this directory. Each diagram auto-crops
 | `04_ai_assisted_workflow.tex` | Iterative AI-assisted design loop (architecture → generation → verification → integration) |
 | `05_verification_funnel.tex` | Defense-in-depth verification funnel (6 narrowing gates) |
 | `06_fpga_datapath_block_diagram.tex` | FPGA real-time datapath — debounce chain through to the Lightweight Bridge |
-| `07_hps_software_polling_flow.tex` | HPS software polling/render flowchart — superseded; the current `docs/images/07_hps_software_polling_flow.png` is a manually revised export, not rebuilt from this file |
+| `07_hps_software_polling_flow.tex` | HPS software polling/render flowchart — superseded; the current `assets/images/07_hps_software_polling_flow.png` is a manually revised export, not rebuilt from this file |
 | `08_token_efficiency_comparison.tex` | Illustrative token-count comparison, distilled spec vs. raw source |
