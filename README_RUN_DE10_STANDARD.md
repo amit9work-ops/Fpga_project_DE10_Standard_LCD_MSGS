@@ -400,7 +400,7 @@ After app starts:
    - `KEY2`: previous message
    - `KEY0`: back to HOME
    - HEX0/HEX1 on the board should show the current message number, matching the LCD.
-5. In MSG, leave the board alone (no key press): each message should auto-advance to the next on its own after a few seconds (per-message duration, see `hw/rtl/msg_duration_rom.v`) — this loops indefinitely, it does NOT go to sleep.
+5. In MSG, leave the board alone (no key press): each message should auto-advance to the next on its own after a few seconds (per-message duration, see `hw/rtl/msg_duration_rom.v`). This loops indefinitely; it does NOT go to sleep.
 6. Return to HOME (`KEY0`) and wait about 60 seconds with no key press: system goes to SLEEP. LEDR[9] should blink at the moment it does.
 7. Press any key in SLEEP: wake to IDLE.
 

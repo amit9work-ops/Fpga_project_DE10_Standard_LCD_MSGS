@@ -1,6 +1,6 @@
 # DE10-Standard LCD Message System
 
-Real-time LCD message board for a physiotherapy room, built on the Terasic DE10-Standard (Cyclone V FPGA + ARM HPS). Also a case study: **AI tools draft every module, but nothing reaches hardware until it passes a simulation gate.** Result — all requirements met at first power-on, zero hardware bugs.
+Real-time LCD message board for a physiotherapy room, built on the Terasic DE10-Standard (Cyclone V FPGA + ARM HPS). Also a case study in simulation-gated AI development: **AI tools draft every module, but nothing reaches hardware until it passes a simulation gate.** Result: all requirements met at first power-on, zero hardware bugs.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Board](https://img.shields.io/badge/Board-Terasic%20DE10--Standard-0068B5)](https://www.terasic.com.tw/cgi-bin/page/archive.pl?Language=English&No=1046)
@@ -16,7 +16,7 @@ Real-time LCD message board for a physiotherapy room, built on the Terasic DE10-
 
 **18** messages · **4** buttons · **42 ms** worst-case latency (< 50 ms target) · **7%** FPGA logic used · **0** / 10,000 bridge errors
 
-Buttons wire only to the FPGA; the LCD wires only to the HPS — that physical fact set the architecture.
+Buttons wire only to the FPGA, and the LCD wires only to the HPS. That physical fact set the architecture.
 
 ## Architecture
 
@@ -25,7 +25,7 @@ Buttons wire only to the FPGA; the LCD wires only to the HPS — that physical f
   <img src="assets/images/06_fpga_datapath_block_diagram.png" alt="FPGA datapath: debounce, edge detect, Message FSM, Countdown Timer, Msg Duration ROM, HEX display" width="820">
 </p>
 
-The FPGA owns the real-time path (debounce → edge detect → FSM → timer) and exposes read-only status registers. The HPS polls them over the Lightweight Bridge (`0xFF200000`) and renders the LCD — it never writes back.
+The FPGA owns the real-time path (debounce → edge detect → FSM → timer) and exposes read-only status registers. The HPS polls them over the Lightweight Bridge (`0xFF200000`) and renders the LCD; it never writes back.
 
 | Module | Role |
 |---|---|
@@ -34,7 +34,7 @@ The FPGA owns the real-time path (debounce → edge detect → FSM → timer) an
 | `message_fsm.v` | 5-state Moore FSM |
 | `idle_timer.v` | runtime-loadable countdown |
 | `msg_duration_rom.v` | per-message duration lookup (0–17) |
-| `hex_display.v` | seconds / last button / message # → 7-segment |
+| `hex_display.v` | seconds / last button / message number to 7-segment |
 
 ## Register Map & FSM
 
@@ -56,7 +56,7 @@ INIT → IDLE → HOME → MSG, with HOME/IDLE timing out to SLEEP and MSG auto-
   <img src="assets/images/07_hps_software_polling_flow.png" alt="HPS software flowchart: 5ms polling loop, redraw only on state/index change" width="520">
 </p>
 
-`main.c` polls the registers every 5 ms and redraws only on change. No message text crosses the bridge — all 18 strings live in `messages.h`; the FPGA sends only a 5-bit index.
+`main.c` polls the registers every 5 ms and redraws only on change. No message text crosses the bridge: all 18 strings live in `messages.h`, and the FPGA sends only a 5-bit index.
 
 ## Simulation-Gated AI Development
 
@@ -65,7 +65,7 @@ INIT → IDLE → HOME → MSG, with HOME/IDLE timing out to SLEEP and MSG auto-
   <img src="assets/images/05_verification_funnel.png" alt="Six-gate verification funnel from board wiring review to hardware bring-up" width="560">
 </p>
 
-Verilog drafted with Claude Code, HPS C with Codex. No code reaches the board until its testbench passes — a failing test revises the prompt, a hardware bug loops back to generation. Six defects were caught this way, all traced to under-specified prompts, not model limits:
+Verilog was drafted with Claude Code, and the HPS C application with Codex. No code reaches the board until its testbench passes: a failing test revises the prompt, and a hardware bug loops back to generation. Six defects were caught this way, all traced to under-specified prompts rather than model limits:
 
 | Defect | Caught by |
 |---|---|
@@ -76,14 +76,13 @@ Verilog drafted with Claude Code, HPS C with Codex. No code reaches the board un
 | Stale LCD text | Manual screen check |
 | Missed press at timeout edge | Edge-case test |
 
-> **Weak:** *"...using a Nios II soft-core processor to drive the display."* — no wiring facts, model defaults to a generic pattern.
-> **Strong:** *"The KEY[0–3] buttons are wired only to FPGA fabric pins, the LCD only to the Processor."* — stated as fact, no room for assumption.
+> **Weak:** *"...using a Nios II soft-core processor to drive the display."* No wiring facts were given, so the model defaulted to a generic pattern.
+> **Strong:** *"The KEY[0–3] buttons are wired only to FPGA fabric pins, the LCD only to the Processor."* Wiring is stated as fact, leaving no room for assumption.
 
 ## The Real Hardware
 
 <p align="center">
-  <img src="assets/images/09_hardware_annotated_photo.jpg" alt="Annotated DE10-Standard: yellow = LCD, orange = HEX display, magenta = KEY buttons, red = Cyclone V SoC, blue = GPIO header" width="420">
-  <img src="assets/images/10_lab_setup_photo.jpg" alt="Full board-to-PC connection setup" width="420">
+  <img src="assets/images/09_hardware_annotated_photo.jpg" alt="Annotated DE10-Standard: yellow = LCD, orange = HEX display, magenta = KEY buttons, red = Cyclone V SoC, blue = GPIO header" width="560">
 </p>
 
 ## Results
@@ -145,6 +144,6 @@ VGA display · Wi-Fi message streaming · audio feedback · touchscreen input ·
 
 ## Credits
 
-Built by **Amit Damari** and **Ido Zylberman**, advised by **Eytan Mann** — Digital Systems Laboratory, Tel Aviv University. Project 3420, EE Final Year, 2025–26.
+Built by **Amit Damari** and **Ido Zylberman**, advised by **Eytan Mann**, Digital Systems Laboratory, Tel Aviv University. Project 3420, EE Final Year, 2025–26.
 
 Released under the [MIT License](LICENSE).
