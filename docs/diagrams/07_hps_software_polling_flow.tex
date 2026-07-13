@@ -33,31 +33,38 @@
   every node/.style={font=\small\sffamily},
   once/.style={
     rectangle, rounded corners=5pt,
-    draw=blue!60!black, fill=blue!10,
+    draw=blue!55!black, line width=0.9pt, fill=blue!8,
     minimum width=7cm, minimum height=0.9cm,
-    align=center, font=\small\bfseries},
+    align=center, font=\small\bfseries,
+    drop shadow={shadow xshift=0.6pt, shadow yshift=-0.6pt, opacity=0.25}},
   loop/.style={
     rectangle, rounded corners=5pt,
-    draw=green!50!black, fill=green!10,
+    draw=teal!55!black, line width=0.9pt, fill=teal!8,
     minimum width=7cm, minimum height=0.9cm,
-    align=center, font=\small\bfseries},
+    align=center, font=\small\bfseries,
+    drop shadow={shadow xshift=0.6pt, shadow yshift=-0.6pt, opacity=0.25}},
   cond/.style={
     diamond, aspect=2.6,
-    draw=orange!70!black, fill=orange!10,
+    draw=orange!65!black, line width=0.9pt, fill=orange!8,
     minimum width=6.4cm, minimum height=0.9cm,
-    align=center, font=\small\bfseries, inner sep=2pt},
+    align=center, font=\small\bfseries, inner sep=2pt,
+    drop shadow={shadow xshift=0.6pt, shadow yshift=-0.6pt, opacity=0.25}},
   upd/.style={
     rectangle, rounded corners=5pt,
-    draw=orange!70!black, fill=orange!10,
-    minimum width=7cm, minimum height=0.9cm,
-    align=center, font=\small\bfseries},
+    draw=TimeoutRed, line width=0.9pt, fill=SleepFill,
+    minimum height=0.72cm,
+    align=center, font=\scriptsize\bfseries,
+    inner xsep=5pt, inner ysep=2pt,
+    drop shadow={shadow xshift=0.45pt, shadow yshift=-0.45pt, opacity=0.18}},
+  blankupd/.style={upd, minimum width=2.9cm},
+  renderupd/.style={upd, text width=3.65cm},
   arr/.style={
     -{Latex[length=2.5mm,width=1.8mm]},
-    draw=black!60, line width=1.1pt},
+    draw=black!65, line width=1.1pt, rounded corners=4pt},
   darr/.style={
     -{Latex[length=2.5mm,width=1.8mm]},
-    draw=black!40, line width=1.0pt, dashed},
-  lbl/.style={font=\scriptsize\sffamily, fill=white, inner sep=2pt},
+    draw=black!40, line width=1.0pt, dashed, rounded corners=4pt},
+  lbl/.style={font=\scriptsize\sffamily, fill=white, inner sep=2pt, rounded corners=2pt},
 ]
 
 \node[once] (init) at (0,  0.0)
@@ -72,38 +79,38 @@
 \node[cond] (slpchk) at (0, -6.5)
   {State == SLEEP / IDLE?};
 
-\node[upd]  (blank) at (-3.6, -8.8)
+\node[blankupd] (blank) at (-2.75, -8.55)
   {Clear / blank LCD};
 
-\node[upd]  (upd)  at (3.6, -8.8)
+\node[renderupd] (upd) at (2.75, -8.55)
   {Fetch message string \& render to LCD};
 
-\node[loop] (slp)  at (0, -10.6)
+\node[loop] (slp)  at (0, -10.15)
   {\texttt{usleep(5\,ms)}};
 
 \draw[arr] (init.south) -- (poll.north);
 \draw[arr] (poll.south) -- (chk.north);
 
 \draw[arr] (chk.south) -- node[lbl,right=4pt]{yes} (slpchk.north);
-\draw[arr] (slpchk.south west) -- node[lbl,left=1pt]{yes} (blank.north);
-\draw[arr] (slpchk.south east) -- node[lbl,right=1pt]{no} (upd.north);
-\draw[arr] (blank.south) -- ++(0,-0.6) -| (slp.north);
-\draw[arr] (upd.south)  -- ++(0,-0.6) -| (slp.north);
+\draw[arr] (slpchk.south west) -- node[lbl,above left=1pt]{yes} (blank.north);
+\draw[arr] (slpchk.south east) -- node[lbl,above right=1pt]{no} (upd.north);
+\draw[arr] (blank.south) -- ++(0,-0.35) -| ([xshift=-0.75cm]slp.north);
+\draw[arr] (upd.south)  -- ++(0,-0.35) -| ([xshift=0.75cm]slp.north);
 
 \draw[darr]
   (chk.east)
-  -- ++(5.5, 0)
-  -- ++(0, -6.9)
+  -- ++(4.3, 0)
+  -- ++(0, -6.45)
   -- (slp.east);
-\node[lbl, align=center] at (9.0, -7.1)
+\node[lbl, align=center] at (5.25, -6.9)
   {no change,\\skip render};
 
 \draw[arr]
   (slp.west)
-  -- ++(-3.2, 0)
-  -- ++(0,  9.0)
+  -- ++(-3.0, 0)
+  -- ++(0,  8.55)
   -- (poll.west);
-\node[lbl, rotate=90] at (-4.2, -6.1) {loop every 5\,ms};
+\node[lbl, rotate=90, align=center] at (-3.75, -5.95) {loop every 5\,ms};
 
 \end{tikzpicture}
 \end{document}
