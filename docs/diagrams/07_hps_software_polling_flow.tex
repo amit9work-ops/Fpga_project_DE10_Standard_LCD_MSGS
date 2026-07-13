@@ -1,0 +1,109 @@
+\documentclass[tikz, border=10pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[table]{xcolor}
+\definecolor{IntelBlue}{HTML}{0068B5}
+\definecolor{IntelLightBlue}{HTML}{DDEEF9}
+\definecolor{FpgaOrange}{HTML}{E67E22}
+\definecolor{FpgaLight}{HTML}{FDEBD0}
+\definecolor{HpsGreen}{HTML}{1A7A4A}
+\definecolor{HpsLight}{HTML}{D5F5E3}
+\definecolor{GrayBg}{HTML}{F2F3F4}
+\definecolor{GrayBorder}{HTML}{AAB7B8}
+\definecolor{PassGreen}{HTML}{D5F5E3}
+\definecolor{PassGreenDark}{HTML}{1E8449}
+\definecolor{RowAlt}{HTML}{F7F9FB}
+\definecolor{SummaryBg}{HTML}{EBF5FB}
+\definecolor{NodeFill}{HTML}{D6EAF8}
+\definecolor{NodeBorder}{HTML}{1B4F72}
+\definecolor{InitFill}{HTML}{E5E7E9}
+\definecolor{InitBorder}{HTML}{717D7E}
+\definecolor{SleepFill}{HTML}{FEF5E7}
+\definecolor{SleepBorder}{HTML}{935116}
+\definecolor{MsgFill}{HTML}{D1F2EB}
+\definecolor{MsgBorder}{HTML}{0E6655}
+\definecolor{TimeoutRed}{HTML}{C0392B}
+\definecolor{BtnBlue}{HTML}{1A5276}
+\definecolor{ArrowGray}{HTML}{717D7E}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc, decorations.pathreplacing, bending, shadows.blur}
+\begin{document}
+\begin{tikzpicture}[
+  every node/.style={font=\small\sffamily},
+  once/.style={
+    rectangle, rounded corners=5pt,
+    draw=blue!60!black, fill=blue!10,
+    minimum width=7cm, minimum height=0.9cm,
+    align=center, font=\small\bfseries},
+  loop/.style={
+    rectangle, rounded corners=5pt,
+    draw=green!50!black, fill=green!10,
+    minimum width=7cm, minimum height=0.9cm,
+    align=center, font=\small\bfseries},
+  cond/.style={
+    diamond, aspect=2.6,
+    draw=orange!70!black, fill=orange!10,
+    minimum width=6.4cm, minimum height=0.9cm,
+    align=center, font=\small\bfseries, inner sep=2pt},
+  upd/.style={
+    rectangle, rounded corners=5pt,
+    draw=orange!70!black, fill=orange!10,
+    minimum width=7cm, minimum height=0.9cm,
+    align=center, font=\small\bfseries},
+  arr/.style={
+    -{Latex[length=2.5mm,width=1.8mm]},
+    draw=black!60, line width=1.1pt},
+  darr/.style={
+    -{Latex[length=2.5mm,width=1.8mm]},
+    draw=black!40, line width=1.0pt, dashed},
+  lbl/.style={font=\scriptsize\sffamily, fill=white, inner sep=2pt},
+]
+
+\node[once] (init) at (0,  0.0)
+  {Startup: \texttt{mmap()} bridge \& initialise LCD};
+
+\node[loop] (poll) at (0, -1.6)
+  {Read \texttt{fsm\_status\_pio} and \texttt{timer\_status\_pio} from FPGA};
+
+\node[cond] (chk)  at (0, -3.7)
+  {State or index changed?};
+
+\node[cond] (slpchk) at (0, -6.5)
+  {State == SLEEP / IDLE?};
+
+\node[upd]  (blank) at (-3.6, -8.8)
+  {Clear / blank LCD};
+
+\node[upd]  (upd)  at (3.6, -8.8)
+  {Fetch message string \& render to LCD};
+
+\node[loop] (slp)  at (0, -10.6)
+  {\texttt{usleep(5\,ms)}};
+
+\draw[arr] (init.south) -- (poll.north);
+\draw[arr] (poll.south) -- (chk.north);
+
+\draw[arr] (chk.south) -- node[lbl,right=4pt]{yes} (slpchk.north);
+\draw[arr] (slpchk.south west) -- node[lbl,left=1pt]{yes} (blank.north);
+\draw[arr] (slpchk.south east) -- node[lbl,right=1pt]{no} (upd.north);
+\draw[arr] (blank.south) -- ++(0,-0.6) -| (slp.north);
+\draw[arr] (upd.south)  -- ++(0,-0.6) -| (slp.north);
+
+\draw[darr]
+  (chk.east)
+  -- ++(5.5, 0)
+  -- ++(0, -6.9)
+  -- (slp.east);
+\node[lbl, align=center] at (9.0, -7.1)
+  {no change,\\skip render};
+
+\draw[arr]
+  (slp.west)
+  -- ++(-3.2, 0)
+  -- ++(0,  9.0)
+  -- (poll.west);
+\node[lbl, rotate=90] at (-4.2, -6.1) {loop every 5\,ms};
+
+\end{tikzpicture}
+\end{document}

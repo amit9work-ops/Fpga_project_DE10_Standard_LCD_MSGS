@@ -1,0 +1,115 @@
+\documentclass[tikz, border=10pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[table]{xcolor}
+\definecolor{IntelBlue}{HTML}{0068B5}
+\definecolor{IntelLightBlue}{HTML}{DDEEF9}
+\definecolor{FpgaOrange}{HTML}{E67E22}
+\definecolor{FpgaLight}{HTML}{FDEBD0}
+\definecolor{HpsGreen}{HTML}{1A7A4A}
+\definecolor{HpsLight}{HTML}{D5F5E3}
+\definecolor{GrayBg}{HTML}{F2F3F4}
+\definecolor{GrayBorder}{HTML}{AAB7B8}
+\definecolor{PassGreen}{HTML}{D5F5E3}
+\definecolor{PassGreenDark}{HTML}{1E8449}
+\definecolor{RowAlt}{HTML}{F7F9FB}
+\definecolor{SummaryBg}{HTML}{EBF5FB}
+\definecolor{NodeFill}{HTML}{D6EAF8}
+\definecolor{NodeBorder}{HTML}{1B4F72}
+\definecolor{InitFill}{HTML}{E5E7E9}
+\definecolor{InitBorder}{HTML}{717D7E}
+\definecolor{SleepFill}{HTML}{FEF5E7}
+\definecolor{SleepBorder}{HTML}{935116}
+\definecolor{MsgFill}{HTML}{D1F2EB}
+\definecolor{MsgBorder}{HTML}{0E6655}
+\definecolor{TimeoutRed}{HTML}{C0392B}
+\definecolor{BtnBlue}{HTML}{1A5276}
+\definecolor{ArrowGray}{HTML}{717D7E}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc, decorations.pathreplacing, bending, shadows.blur}
+\begin{document}
+\begin{tikzpicture}[
+  every node/.style={font=\small\sffamily},
+  pip/.style={rectangle, rounded corners=4pt,
+    draw=green!60!black, fill=green!12,
+    minimum width=2.0cm, minimum height=1.1cm,
+    align=center, font=\small\bfseries},
+  tim/.style={rectangle, rounded corners=4pt,
+    draw=red!70!black, fill=red!10,
+    minimum width=2.0cm, minimum height=1.1cm,
+    align=center, font=\small\bfseries},
+  ext/.style={rectangle, rounded corners=4pt,
+    draw=gray!60, fill=gray!10,
+    minimum width=2.0cm, minimum height=1.1cm,
+    align=center, font=\small\bfseries},
+  hps/.style={rectangle, rounded corners=4pt,
+    draw=blue!70!black, fill=blue!10,
+    minimum width=2.2cm, minimum height=2.0cm,
+    align=center, font=\small\bfseries},
+  bridgebox/.style={rectangle, rounded corners=3pt,
+    draw=blue!70!black, fill=white,
+    inner xsep=3pt, inner ysep=2pt,
+    align=center, font=\scriptsize\itshape\color{blue!70!black}},
+  arr/.style={-{Latex[length=2.5mm,width=1.8mm]},
+    draw=black!70, line width=1.0pt},
+  darr/.style={-{Latex[length=2.5mm,width=1.8mm]},
+    draw=blue!70!black, line width=1.1pt},
+  tarr/.style={-{Latex[length=2.5mm,width=1.8mm]},
+    draw=red!80!black, line width=1.2pt},
+  lbl/.style={font=\scriptsize\sffamily, fill=white, inner sep=1pt},
+]
+
+\node[ext] (keys) at (0.0,  0) {\shortstack{KEY[3:0]\\board pins}};
+\node[pip] (deb)  at (3.1,  0) {\shortstack{Debouncer\\20\,ms}};
+\node[pip] (edg)  at (6.2,  0) {\shortstack{Edge\\Detector}};
+\node[pip] (fsm)  at (9.3,  0) {\shortstack{Message\\FSM}};
+\node[pip] (hex)  at (12.4, 0) {\shortstack{HEX\\Display}};
+
+\node[hps] (hps) at (19.0, -1.6) {\shortstack{HPS\\ARM Linux\\LCD app}};
+
+\node[bridgebox] (bridgepio) at (16.1,-1.6)
+  {\shortstack{via LW\\Bridge\\(PIO)}};
+
+\node[tim] (tmr) at (9.3,  -3.6) {\shortstack{Countdown\\Timer}};
+\node[pip] (rom) at (13.7, -3.6) {\shortstack{Msg Duration\\ROM}};
+
+\draw[arr] (keys.east) -- node[lbl,above]{raw}    (deb.west);
+\draw[arr] (deb.east)  -- node[lbl,above]{stable} (edg.west);
+\draw[arr] (edg.east)  -- node[lbl,above]{pulse}  (fsm.west);
+\draw[arr] (fsm.east)  -- node[lbl,above]{state}  (hex.west);
+
+% timeout: Countdown Timer -> Message FSM (clean vertical, left of centre)
+\draw[tarr] ([xshift=-3mm]tmr.north) -- ([xshift=-3mm]fsm.south);
+\node[lbl,left] at (8.9,-1.9) {timeout};
+
+% any press: Edge Detector -> Countdown Timer (orthogonal, into west edge)
+\draw[tarr] (edg.south) -- (6.2,-3.6) -- (tmr.west);
+\node[lbl] at (6.2,-2.0) {any press};
+
+% index: Message FSM -> Msg Duration ROM (orthogonal, right of the timeout arrow)
+\draw[arr] ([xshift=5mm]fsm.south) -- (9.8,-1.5) -- (13.7,-1.5) -- (rom.north);
+\node[lbl,right] at (9.9,-1.15) {index};
+
+% load value: Msg Duration ROM -> Countdown Timer (horizontal)
+\draw[tarr] (rom.west) -- node[lbl,above]{load value} (tmr.east);
+
+% state + index: HEX Display -> HPS over the Lightweight Bridge
+\draw[darr]
+  (hex.east)
+  -- (17.1,  0.0)
+  -- (17.1, -1.05)
+  -- ($(hps.west)+(0, 0.55)$);
+\node[lbl,above] at (15.3, 0.0) {state\,+\,index};
+
+% seconds remaining: Countdown Timer -> HPS over the Lightweight Bridge
+\draw[darr]
+  (tmr.south)
+  -- (9.3,  -5.6)
+  -- (17.1, -5.6)
+  -- (17.1, -2.15)
+  -- ($(hps.west)+(0,-0.55)$);
+\node[lbl] at (12.7,-5.6) {seconds remaining};
+
+\end{tikzpicture}
+\end{document}
