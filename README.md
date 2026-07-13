@@ -18,6 +18,11 @@ Real-time LCD message board for a physiotherapy room, built on the Terasic DE10-
 
 Buttons wire only to the FPGA, and the LCD wires only to the HPS. That physical fact set the architecture.
 
+**Recent highlights:**
+*   Per-message auto-advance slideshow: each message displays for its own duration (`msg_duration_rom.v`) then auto-advances; manual KEY0/1/2 always takes priority.
+*   60s HOME inactivity timeout (was 15s): only HOME sleeps, and the MSG slideshow keeps cycling on its own.
+*   On-board demo indicators: HEX0/1 show the active message number, and LEDR[9] blinks on every countdown expiry.
+
 ## Architecture
 
 <p align="center">
@@ -48,7 +53,15 @@ The FPGA owns the real-time path (debounce → edge detect → FSM → timer) an
 | `fsm_status_pio` | `0x6000` | [7:5] state · [4:0] message index |
 | `timer_status_pio` | `0x7000` | [0] timeout · [6:1] seconds remaining |
 
-INIT → IDLE → HOME → MSG, with HOME/IDLE timing out to SLEEP and MSG auto-advancing (wrap). **On a tie, the button always beats the timer.**
+| State | Encoding [7:5] | Meaning |
+|---|---|---|
+| INIT | `000` | Power-on reset; auto-advances to IDLE |
+| IDLE | `001` | Waiting for the first button press |
+| HOME | `010` | Idle screen; 60s timeout to SLEEP, any button to MSG |
+| MSG | `011` | Showing one of 18 messages; auto-advances (wrap) on its own duration |
+| SLEEP | `100` | LCD blanked; any button wakes to IDLE |
+
+**On a tie, the button always beats the timer.**
 
 ## HPS Software
 
@@ -67,14 +80,14 @@ INIT → IDLE → HOME → MSG, with HOME/IDLE timing out to SLEEP and MSG auto-
 
 Verilog was drafted with Claude Code, and the HPS C application with Codex. No code reaches the board until its testbench passes: a failing test revises the prompt, and a hardware bug loops back to generation. Six defects were caught this way, all traced to under-specified prompts rather than model limits:
 
-| Defect | Caught by |
-|---|---|
-| LCD assumed wired to FPGA | Board wiring review |
-| Register layout mismatch | Wrong text on LCD |
-| Bit-width mismatch | Verilator lint |
-| Failed timing closure | Quartus timing report |
-| Stale LCD text | Manual screen check |
-| Missed press at timeout edge | Edge-case test |
+| Defect | Caught by | Fix |
+|---|---|---|
+| LCD assumed wired to FPGA | Board wiring review | Switched to the FPGA/HPS split architecture |
+| Register layout mismatch | Wrong text on LCD | Corrected the shared register contract |
+| Bit-width mismatch | Verilator lint | Fixed signal widths |
+| Failed timing closure | Quartus timing report | Rewrote the critical logic path |
+| Stale LCD text | Manual screen check | Fixed redraw ordering in the HPS render loop |
+| Missed press at timeout edge | Edge-case test | Fixed timer/priority comparison so button events always win |
 
 > **Weak:** *"...using a Nios II soft-core processor to drive the display."* No wiring facts were given, so the model defaulted to a generic pattern.
 > **Strong:** *"The KEY[0–3] buttons are wired only to FPGA fabric pins, the LCD only to the Processor."* Wiring is stated as fact, leaving no room for assumption.
@@ -84,6 +97,9 @@ Verilog was drafted with Claude Code, and the HPS C application with Codex. No c
 <p align="center">
   <img src="assets/images/09_hardware_annotated_photo.jpg" alt="Annotated DE10-Standard: yellow = LCD, orange = HEX display, magenta = KEY buttons, red = Cyclone V SoC, blue = GPIO header" width="560">
 </p>
+
+**Boxes (on-board blocks):** yellow = character LCD (HPS side) · orange = HEX display (FPGA side) · magenta = KEY pushbuttons (FPGA side) · red = Cyclone V FPGA/SoC area · blue = GPIO expansion header.
+**Arrows (setup connections):** orange = USB programming cable · blue = board power input · yellow = microSD/Linux boot media · green = HPS-side external link.
 
 ## Results
 
