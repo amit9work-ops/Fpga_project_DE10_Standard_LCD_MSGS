@@ -58,7 +58,21 @@
   at ({4.0*\bitw},-\rowgap) {Seconds Remaining\\[1pt]bits [6:1]};
 \node[bitbox, fill=SleepFill, text=SleepBorder, minimum width={1*\bitw cm}]
   at ({7.5*\bitw},-\rowgap) {TO\\[1pt]0};
-\node[font=\tiny\sffamily, anchor=west] at (0,-2.05)
-  {Rsvd = Reserved bit 7; TO = Timeout bit 0.};
+
+% ROUND 2: third row -- msg_text_status_pio (the wide-interface seqlock).
+% msg_text_pio_0..15 (16 x 32-bit raw text words) are not bit-field
+% diagrams worth drawing -- just ASCII bytes -- so only the status
+% register, which has real sub-fields, is shown here.
+\foreach \b in {0,...,7} {
+  \node[bitnum] at ({(7-\b+0.5)*\bitw},-2.15) {\b};
+}
+\node[reglbl] at (-0.15,-2.7) {\texttt{msg\_text\_status\_pio}};
+\node[bitbox, fill=MsgFill, text=MsgBorder, minimum width={3*\bitw cm}]
+  at ({1.5*\bitw},-2.7) {Seqlock Seq\\[1pt]bits [7:5]};
+\node[bitbox, fill=HpsLight, text=HpsGreen, minimum width={5*\bitw cm}]
+  at ({5.5*\bitw},-2.7) {Text Index\\[1pt]bits [4:0]};
+
+\node[font=\tiny\sffamily, anchor=west] at (0,-3.35)
+  {Rsvd = Reserved bit 7; TO = Timeout bit 0. Text Index is the authority for which message the 16 wide data words (msg\_text\_pio\_0..15, not shown) belong to.};
 \end{tikzpicture}
 \end{document}

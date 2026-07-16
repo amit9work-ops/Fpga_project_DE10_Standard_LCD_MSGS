@@ -19,8 +19,9 @@ Real-time LCD message board for a physiotherapy room, built on the Terasic DE10-
 Buttons wire only to the FPGA, and the LCD wires only to the HPS. That physical fact set the architecture.
 
 **Recent highlights:**
-*   Per-message auto-advance slideshow: each message displays for its own duration (`msg_duration_rom.v`) then auto-advances; manual KEY0/1/2 always takes priority.
-*   60s HOME inactivity timeout (was 15s): only HOME sleeps, and the MSG slideshow keeps cycling on its own.
+*   Category-based hardware navigation: each of the 4 keys jumps to a fixed category (Exercises / Session / Emergency / Default-Home), and the per-message duration timer auto-advances sequentially within it; manual key presses always take priority.
+*   Message text now lives entirely in FPGA fabric and crosses the bridge over a wide 16-word register interface with a seqlock, not in the HPS C code.
+*   A system-idle sleep timer is armed only while parked at Default, so an active Exercise/Session/Emergency slideshow can never be interrupted by sleep.
 *   On-board demo indicators: HEX0/1 show the active message number, and LEDR[9] blinks on every countdown expiry.
 
 ## Architecture
@@ -36,40 +37,43 @@ The FPGA owns the real-time path (debounce → edge detect → FSM → timer) an
 |---|---|
 | `button_debouncer.v` | 20 ms stability counter (1,000,000 cycles @ 50 MHz) |
 | `button_edge_detector.v` | one pulse per press |
-| `message_fsm.v` | 5-state Moore FSM |
-| `idle_timer.v` | runtime-loadable countdown |
+| `message_fsm.v` | 3-state Moore FSM, table-driven category navigation |
+| `msg_nav_rom.v` | (message index, key/timeout action) → next index, + `in_default` |
+| `msg_text_rom.v` | message index → 512-bit text (4 lines × 16 chars) |
+| `msg_text_export.v` | registers text + index together; seqlock sequence counter |
+| `idle_timer.v` | runtime-loadable countdown (one instance per timer, per-message + sleep) |
 | `msg_duration_rom.v` | per-message duration lookup (0–17) |
 | `hex_display.v` | seconds / last button / message number to 7-segment |
 
 ## Register Map & FSM
 
 <p align="center">
-  <img src="assets/images/03_register_bitfield_layout.png" alt="Bit-field layout of fsm_status_pio and timer_status_pio registers" width="480">
-  <img src="assets/images/02_fsm_state_diagram.png" alt="5-state Moore FSM: INIT, IDLE, HOME, MSG, SLEEP" width="620">
+  <img src="assets/images/03_register_bitfield_layout.png" alt="Bit-field layout of fsm_status_pio, timer_status_pio, and the wide message-text registers" width="480">
+  <img src="assets/images/02_fsm_state_diagram.png" alt="3-state Moore FSM: INIT, MSG, SLEEP, with category-jump and sequential-timeout navigation" width="620">
 </p>
 
 | PIO | Offset | Fields |
 |---|---|---|
-| `fsm_status_pio` | `0x6000` | [7:5] state · [4:0] message index |
-| `timer_status_pio` | `0x7000` | [0] timeout · [6:1] seconds remaining |
+| `fsm_status_pio` | `0x0110` | [7:5] state · [4:0] message index |
+| `timer_status_pio` | `0x0100` | [0] timeout · [6:1] seconds remaining |
+| `msg_text_pio_0`..`15` | `0x0400`–`0x04F0` | 16 × 32-bit words, word *w* = text bytes `4w..4w+3` |
+| `msg_text_status_pio` | `0x0500` | [7:5] seqlock sequence · [4:0] text index |
 
 | State | Encoding [7:5] | Meaning |
 |---|---|---|
-| INIT | `000` | Power-on reset; auto-advances to IDLE |
-| IDLE | `001` | Waiting for the first button press |
-| HOME | `010` | Idle screen; 60s timeout to SLEEP, any button to MSG |
-| MSG | `011` | Showing one of 18 messages; auto-advances (wrap) on its own duration |
-| SLEEP | `100` | LCD blanked; any button wakes to IDLE |
+| INIT | `000` | Power-on reset; auto-advances to MSG at the Default head (0) |
+| MSG | `001` | Showing a message; any key jumps to that key's category head, per-message timeout advances within the category |
+| SLEEP | `010` | LCD blanked; armed only while parked in Default; any key wakes directly to that key's category head |
 
-**On a tie, the button always beats the timer.**
+Navigation (round 2, per-category, not a linear walk): **KEY0**→Exercises · **KEY1**→Session · **KEY2**→Emergency · **KEY3**→Default/Home. Each key is a fixed jump to its category's first message, regardless of the current one. A category's last message times out back to Default — except Emergency, which sticks until a key press. **On a tie, a button always beats a timer.**
 
 ## HPS Software
 
 <p align="center">
-  <img src="assets/images/07_hps_software_polling_flow.png" alt="HPS software flowchart: 5ms polling loop, redraw only on state/index change" width="520">
+  <img src="assets/images/07_hps_software_polling_flow.png" alt="HPS software flowchart: 5ms polling loop, seqlock read of the message text, redraw only on state/index change" width="520">
 </p>
 
-`main.c` polls the registers every 5 ms and redraws only on change. No message text crosses the bridge: all 18 strings live in `messages.h`, and the FPGA sends only a 5-bit index.
+`main.c` polls `fsm_status_pio` for state and reads the current message over the wide interface every 5 ms, redrawing only when the state or the echoed text index changes. Message text lives entirely in FPGA fabric (`msg_text_rom.v`): the HPS holds no message strings at all. The read is a **seqlock**: read `msg_text_status_pio` → read all 16 text words → re-read the status; if the sequence changed mid-read (the FPGA advanced to a new message while being read), retry — this guarantees the HPS never renders half of one message stitched to half of the next.
 
 ## Simulation-Gated AI Development
 
@@ -116,7 +120,7 @@ Verilog was drafted with Claude Code, and the HPS C application with Codex. No c
 | Bridge reliability | 0 errors / 10,000 reads | 0 |
 | Button debounce | 0 false triggers | 0 |
 
-Eight testbenches (`tb_button_debouncer`, `tb_button_edge_detector`, `tb_message_fsm`, `tb_idle_timer`, `tb_hex_display`, `tb_soc_register_contract`, `tb_fpga_msg_controller`, `tb_clock_divider`) required zero errors before any module reached hardware.
+Eleven canonical testbenches (`tb_button_debouncer`, `tb_button_edge_detector`, `tb_idle_timer`, `tb_hex_display`, `tb_message_fsm`, `tb_msg_text_rom`, `tb_msg_nav_rom`, `tb_msg_text_export`, `tb_fpga_msg_controller`, `tb_soc_register_contract`, `tb_top_level`) required zero errors before any module reached hardware — including a 500-iteration randomized model-vs-DUT campaign for the FSM and a directed seqlock-tearing attack for the wide text interface.
 
 ## Repository Structure
 
@@ -124,7 +128,7 @@ Eight testbenches (`tb_button_debouncer`, `tb_button_edge_detector`, `tb_message
 ├── hw/rtl/           Verilog RTL modules
 ├── hw/quartus/       Quartus project + pin assignments
 ├── sw/hps_app/       HPS C application + Makefile
-├── sim/testbenches/  8 Verilog simulation testbenches
+├── hw/sim/testbenches/  10 Verilog simulation testbenches
 ├── scripts/          Build, deployment, hardware sign-off automation
 ├── assets/           Diagram sources (TikZ) + rendered images/photos
 └── README.md

@@ -29,14 +29,18 @@
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc, decorations.pathreplacing, bending, shadows.blur}
 \begin{document}
+% ROUND 2: 3-state FSM (INIT/MSG/SLEEP), category-based navigation.
+% Each key is a FIXED jump to its category head; TIMEOUT advances
+% sequentially within the category, falling back to Default at a
+% non-emergency category's end, sticking forever in Emergency. The 4 key
+% targets are listed in a side legend rather than as 4 separate crowded
+% self-loops on one small node.
 \begin{tikzpicture}[
   every node/.style={font=\sffamily},
-  state/.style={circle, minimum size=1.85cm, line width=1.6pt,
+  state/.style={circle, minimum size=2.0cm, line width=1.6pt,
                 align=center, font=\normalsize\bfseries},
   initstate/.style={state, draw=InitBorder, fill=InitFill,
                     text=InitBorder},
-  normalstate/.style={state, draw=NodeBorder, fill=NodeFill,
-                      text=NodeBorder},
   msgstate/.style={state, draw=MsgBorder, fill=MsgFill,
                    text=MsgBorder},
   sleepstate/.style={state, draw=SleepBorder, fill=SleepFill,
@@ -51,49 +55,49 @@
   smalllbl/.style={font=\tiny\bfseries, inner sep=0.4pt}
 ]
 
-\node[initstate]   (INIT)  at (0.0,  0.0) {INIT};
-\node[normalstate] (IDLE)  at (3.6,  0.0) {IDLE};
-\node[normalstate] (HOME)  at (7.4,  0.0) {HOME};
-\node[msgstate]    (MSG)   at (11.2, 0.0) {MSG};
-\node[sleepstate]  (SLEEP) at (9.3, -3.15) {SLEEP};
+\node[initstate] (INIT)  at (0.0, 0.0)  {INIT};
+\node[msgstate]  (MSG)   at (5.2, 0.0)  {MSG};
+\node[sleepstate](SLEEP) at (11.0, 0.0) {SLEEP};
 
 \draw[timeoutarr] ([xshift=-1.35cm]INIT.west) --
   node[lbl, above, text=TimeoutRed] {reset} (INIT.west);
 \draw[autoarr] (INIT.east) --
-  node[lbl, above, text=ArrowGray] {auto} (IDLE.west);
+  node[lbl, above, text=ArrowGray] {auto} (MSG.west);
 
-\draw[btnarr] ([yshift=0.33cm]IDLE.east) --
-  node[smalllbl, above=1pt, text=BtnBlue] {any\_button}
-  ([yshift=0.33cm]HOME.west);
-\draw[btnarr] ([yshift=-0.33cm]HOME.west) --
-  node[lbl, below, text=BtnBlue] {KEY0}
-  ([yshift=-0.33cm]IDLE.east);
+% MSG <-> SLEEP: two parallel offset arrows.
+\draw[timeoutarr] ([yshift=0.30cm]MSG.east) --
+  node[smalllbl, above=1pt, text=TimeoutRed, align=center]
+       {sleep\_timeout\\(DEFAULT only)}
+  ([yshift=0.30cm]SLEEP.west);
+\draw[btnarr] ([yshift=-0.30cm]SLEEP.west) --
+  node[smalllbl, below=1pt, text=BtnBlue, align=center]
+       {any key $\to$\\category head}
+  ([yshift=-0.30cm]MSG.east);
 
-\draw[btnarr] ([yshift=0.33cm]HOME.east) --
-  node[smalllbl, above=1pt, text=BtnBlue] {KEY1/KEY2}
-  ([yshift=0.33cm]MSG.west);
-\draw[btnarr] ([yshift=-0.33cm]MSG.west) --
-  node[lbl, below, text=BtnBlue] {KEY0}
-  ([yshift=-0.33cm]HOME.east);
-
-\draw[btnarr] (MSG.north east)
-  to[out=45, in=135, looseness=5.0]
-  node[smalllbl, above=1pt, text=BtnBlue] {KEY1/KEY2}
-  (MSG.north west);
-
-\draw[timeoutarr] (HOME.south) --
-  node[lbl, left, text=TimeoutRed] {timeout}
-  (SLEEP.north west);
-\draw[timeoutarr] (MSG.south east)
-  to[out=-30, in=30, looseness=5.0]
-  node[smalllbl, right=1pt, text=TimeoutRed, align=center]
-       {timeout:\\auto-advance\\(wrap)}
+% MSG self-loop (top): any of KEY0-3 -- fixed jump, see legend below.
+\draw[btnarr] (MSG.north west)
+  to[out=120, in=60, looseness=8]
+  node[lbl, above=2pt, text=BtnBlue, align=center]
+       {KEY0-3: fixed jump to\\that key's category head (see legend)}
   (MSG.north east);
 
-\draw[btnarr, rounded corners=12pt]
-  (SLEEP.west) -- (3.6,-3.15) --
-  node[smalllbl, left=1pt, text=BtnBlue, pos=0.78] {any\_button}
-  (IDLE.south);
+% MSG self-loop (bottom): TIMEOUT advances within the current category.
+\draw[timeoutarr] (MSG.south west)
+  to[out=240, in=300, looseness=8]
+  node[lbl, below=2pt, text=TimeoutRed, align=center]
+       {timeout: next in category\\(non-emergency last $\to$ DEFAULT;\\EMERGENCY sticks)}
+  (MSG.south east);
+
+% Legend: which key maps to which category head.
+\node[draw=GrayBorder, rounded corners=4pt, fill=GrayBg, align=left,
+      font=\small, inner sep=8pt, anchor=north]
+  at (5.2, -5.3) {%
+    \textbf{Key} \hspace{0.4cm} \textbf{Category head}\\[2pt]
+    \textcolor{BtnBlue}{KEY0} \hspace{0.9cm} EXERCISE (msg 3)\\
+    \textcolor{BtnBlue}{KEY1} \hspace{0.9cm} SESSION (msg 8)\\
+    \textcolor{BtnBlue}{KEY2} \hspace{0.9cm} EMERGENCY (msg 16)\\
+    \textcolor{BtnBlue}{KEY3} \hspace{0.9cm} DEFAULT (msg 0) -- also escapes a stuck EMERGENCY
+  };
 
 \end{tikzpicture}
 \end{document}
