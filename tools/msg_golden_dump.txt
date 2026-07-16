@@ -1,4 +1,4 @@
-LCD message reference dump (generated from sw/hps_app/messages.h)
+LCD message reference dump (generated from tools/msg_text.json)
 Byte order per message: line*16+col, lines 0..3.
 Categories: DEFAULT (KEY3 -> head 0), EXERCISE (KEY0 -> head 3), SESSION (KEY1 -> head 8), EMERGENCY (KEY2 -> head 16)
 
