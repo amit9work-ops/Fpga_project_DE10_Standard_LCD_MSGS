@@ -229,6 +229,8 @@ module DE10_Standard_GHRD(
   wire [5:0]  ctrl_seconds_remaining;  // Countdown for display (0-63)
   wire [2:0]  ctrl_fsm_state;          // Verilog UI FSM state
   wire [4:0]  ctrl_fsm_msg_index;      // Verilog UI FSM message index
+  wire [511:0] ctrl_msg_text_bus;      // Registered snapshot of current message
+  wire [7:0]  ctrl_msg_text_status;    // {seq[2:0], text_index[4:0]}
   wire [6:0]  hex0_out, hex1_out, hex2_out, hex3_out, hex4_out, hex5_out;
 
 // connection of internal logics
@@ -347,12 +349,33 @@ soc_system u0 (
 		  .led_pio_external_connection_export    ( fpga_led_internal ),               //                               led_pio_external_connection.export                     
         .dipsw_pio_external_connection_export  ( SW ),                 //                               dipsw_pio_external_connection.export
         .button_pio_external_connection_export ( fpga_debounced_buttons ),              //                               button_pio_external_connection.export 
-      // --- NEW: Custom LCD Message Controller PIOs ---
+      // --- Custom LCD Message Controller PIOs ---
+      // Actual bridge offsets (from soc_system.sopcinfo, mirrored in the
+      // generated sw/hps_app/soc_addr_map.h): fsm_status_pio @ 0x0110,
+      // timer_status_pio @ 0x0100, button_pio @ 0x0140.
       // fsm_status_pio [7:5]=FSM state, [4:0]=FSM message index
-      // Debounced levels remain available via button_pio @ 0x5000.
-      .fsm_status_pio_external_connection_export   ({ctrl_fsm_state, ctrl_fsm_msg_index}), // 8-bit @ 0x6000
+      .fsm_status_pio_external_connection_export   ({ctrl_fsm_state, ctrl_fsm_msg_index}), // 8-bit
 		  // timer_status_pio: [7]=reserved, [6:1]=seconds_remaining(0-63), [0]=timeout_flag
-		  .timer_status_pio_external_connection_export  ({1'b0, ctrl_seconds_remaining, ctrl_timeout_flag}), // 8-bit @ 0x7000
+		  .timer_status_pio_external_connection_export  ({1'b0, ctrl_seconds_remaining, ctrl_timeout_flag}), // 8-bit
+      // Message-text wide interface: 16 x 32-bit words (word w = text bytes
+      // 4w..4w+3, byte B=line*16+col) plus status {seq[2:0], text_index[4:0]}.
+      .msg_text_pio_0_external_connection_export   (ctrl_msg_text_bus[ 32*0  +: 32]),
+      .msg_text_pio_1_external_connection_export   (ctrl_msg_text_bus[ 32*1  +: 32]),
+      .msg_text_pio_2_external_connection_export   (ctrl_msg_text_bus[ 32*2  +: 32]),
+      .msg_text_pio_3_external_connection_export   (ctrl_msg_text_bus[ 32*3  +: 32]),
+      .msg_text_pio_4_external_connection_export   (ctrl_msg_text_bus[ 32*4  +: 32]),
+      .msg_text_pio_5_external_connection_export   (ctrl_msg_text_bus[ 32*5  +: 32]),
+      .msg_text_pio_6_external_connection_export   (ctrl_msg_text_bus[ 32*6  +: 32]),
+      .msg_text_pio_7_external_connection_export   (ctrl_msg_text_bus[ 32*7  +: 32]),
+      .msg_text_pio_8_external_connection_export   (ctrl_msg_text_bus[ 32*8  +: 32]),
+      .msg_text_pio_9_external_connection_export   (ctrl_msg_text_bus[ 32*9  +: 32]),
+      .msg_text_pio_10_external_connection_export  (ctrl_msg_text_bus[ 32*10 +: 32]),
+      .msg_text_pio_11_external_connection_export  (ctrl_msg_text_bus[ 32*11 +: 32]),
+      .msg_text_pio_12_external_connection_export  (ctrl_msg_text_bus[ 32*12 +: 32]),
+      .msg_text_pio_13_external_connection_export  (ctrl_msg_text_bus[ 32*13 +: 32]),
+      .msg_text_pio_14_external_connection_export  (ctrl_msg_text_bus[ 32*14 +: 32]),
+      .msg_text_pio_15_external_connection_export  (ctrl_msg_text_bus[ 32*15 +: 32]),
+      .msg_text_status_pio_external_connection_export (ctrl_msg_text_status),
 		  .hps_0_h2f_reset_reset_n               ( hps_fpga_reset_n ),                //                hps_0_h2f_reset.reset_n
 		  .hps_0_f2h_cold_reset_req_reset_n      (~hps_cold_reset ),      //       hps_0_f2h_cold_reset_req.reset_n
 		  .hps_0_f2h_debug_reset_req_reset_n     (~hps_debug_reset ),     //      hps_0_f2h_debug_reset_req.reset_n

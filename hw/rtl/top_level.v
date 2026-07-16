@@ -7,15 +7,19 @@
 //              board-level FPGA testing (no HPS/Qsys required).
 //              Instantiates fpga_msg_controller with all DE10-Standard I/O.
 //
-//              On the DE10-Standard board:
-//                KEY[0]   = active-LOW reset (hold to reset, release to run)
-//                KEY[1]   = Button 1 (NEXT)
-//                KEY[2]   = Button 2 (BACK)
-//                KEY[3]   = Button 3 (extra)
-//                HEX5:HEX4 = countdown (decimal): Home/idle inactivity timer
-//                            (60s default) while HOME/IDLE, or the current
-//                            message's own duration while in MSG (slideshow)
-//                HEX2      = Last button pressed (1-3, F=none)
+//              On the DE10-Standard board (round 2, category nav model):
+//                KEY[0]   = active-LOW reset (hold to reset, release to run);
+//                           also wired to key_in[0] (controller KEY0/EXERCISE)
+//                KEY[1]   = key_in[1] -> controller KEY1: SESSION
+//                KEY[2]   = key_in[2] -> controller KEY2: EMERGENCY
+//                KEY[3]   = key_in[3] -> controller KEY3: DEFAULT/Home
+//                NOTE: KEY[0] is wired to reset here, so controller KEY0
+//                (EXERCISE) is not reachable as a real button press on this
+//                standalone build -- only the full DE10_Standard_GHRD.v/Qsys
+//                build has all 4 KEYs free for navigation. Do not use this
+//                module to validate the EXERCISE jump or KEY0 behavior.
+//                HEX5:HEX4 = per-message duration countdown (decimal)
+//                HEX2      = Last button pressed (0-3, F=none)
 //                HEX0/1/3  = Reserved (show 0)
 //                LEDR[3:0] = Debounced button levels (active-HIGH)
 //                LEDR[4]   = Timeout flag
@@ -59,8 +63,9 @@ module top_level (
     fpga_msg_controller #(
         .CLK_FREQ_HZ (50_000_000),    // 50 MHz — match CLOCK_50
         .DEBOUNCE_MS (20),             // 20 ms debounce window
-        .TIMEOUT_SEC (60),             // Home/idle inactivity timeout (S_MSG
-                                        // uses per-message duration instead)
+        .TIMEOUT_SEC (60),             // System-idle (sleep) timeout, armed only
+                                        // while parked in DEFAULT; the per-message
+                                        // timer always uses msg_duration_rom instead
         .NUM_BUTTONS (4)               // All 4 KEY buttons
     ) u_ctrl (
         .clk               (CLOCK_50),

@@ -1,129 +1,130 @@
 LCD message reference dump (generated from sw/hps_app/messages.h)
 Byte order per message: line*16+col, lines 0..3.
+Categories: DEFAULT (KEY3 -> head 0), EXERCISE (KEY0 -> head 3), SESSION (KEY1 -> head 8), EMERGENCY (KEY2 -> head 16)
 
-MSG  0  [INTRO]
+MSG  0  [DEFAULT]
    | Amit Damari    |
    |                |
    | Ido Zylberman  |
    | 8 August 2026  |
-   nav: KEY1->1  KEY2->3  KEY3->16  TMO ->1
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->1
 
-MSG  1  [INTRO]
+MSG  1  [DEFAULT]
    | Eytan Mann     |
    |                |
    | Project 3420   |
    | Best Project   |
-   nav: KEY1->2  KEY2->3  KEY3->16  TMO ->2
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->2
 
-MSG  2  [INTRO]
+MSG  2  [DEFAULT]
    |      TAU       |
    |                |
    | Tel Aviv       |
    | University     |
-   nav: KEY1->0  KEY2->3  KEY3->16  TMO ->13
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->17
 
 MSG  3  [EXERCISE]
    | Exercise 1 of 4|
    |                |
    | Breathe In Deep|
    | Hold 8 Seconds |
-   nav: KEY1->4  KEY2->7  KEY3->16  TMO ->4
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->4
 
 MSG  4  [EXERCISE]
    | Exercise 2 of 4|
    |                |
    | Breathe Out Now|
    | Slow and Steady|
-   nav: KEY1->5  KEY2->7  KEY3->16  TMO ->5
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->5
 
 MSG  5  [EXERCISE]
    | Exercise 3 of 4|
    |                |
    | Raise Both Arms|
    | Hold 10 Seconds|
-   nav: KEY1->6  KEY2->7  KEY3->16  TMO ->6
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->6
 
 MSG  6  [EXERCISE]
    | Exercise 4 of 4|
    |                |
    | Lower Arms Down|
    | Relax and Rest |
-   nav: KEY1->3  KEY2->7  KEY3->16  TMO ->7
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->7
 
-MSG  7  [REST]
+MSG  7  [EXERCISE]
    |    REST TIME   |
    |                |
    | Take a Break   |
    | Drink Water    |
-   nav: KEY1->7  KEY2->8  KEY3->16  TMO ->14
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->0
 
-MSG  8  [WAITING]
+MSG  8  [SESSION]
    | Please Wait    |
    |                |
    | Therapist Is   |
    | On the Way     |
-   nav: KEY1->9  KEY2->10  KEY3->16  TMO ->9
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->9
 
-MSG  9  [WAITING]
+MSG  9  [SESSION]
    | Your Turn Soon |
    |                |
    | Stay Seated    |
    | We Will Call   |
-   nav: KEY1->8  KEY2->10  KEY3->16  TMO ->17
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->10
 
-MSG 10  [SAFETY]
+MSG 10  [SESSION]
    |  IMPORTANT     |
    |                |
    | Need Help Now  |
    | Press Any Key  |
-   nav: KEY1->11  KEY2->12  KEY3->16  TMO ->10
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->11
 
-MSG 11  [SAFETY]
+MSG 11  [SESSION]
    | Do Not Leave   |
    |                |
    | Stay In Room   |
    | Until Called   |
-   nav: KEY1->10  KEY2->12  KEY3->16  TMO ->11
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->12
 
-MSG 12  [STATUS]
+MSG 12  [SESSION]
    | Session Paused |
    |                |
    | Please Wait    |
    | Will Resume    |
-   nav: KEY1->13  KEY2->14  KEY3->16  TMO ->12
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->13
 
-MSG 13  [STATUS]
+MSG 13  [SESSION]
    | Session Active |
    |                |
    | In Progress    |
    | Do Not Disturb |
-   nav: KEY1->12  KEY2->14  KEY3->16  TMO ->3
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->14
 
-MSG 14  [DONE]
+MSG 14  [SESSION]
    | Well Done      |
    |                |
    | Exercise Set   |
    | Completed      |
-   nav: KEY1->15  KEY2->16  KEY3->16  TMO ->15
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->15
 
-MSG 15  [DONE]
+MSG 15  [SESSION]
    | Session Done   |
    |                |
    | Please Wait    |
    | For Discharge  |
-   nav: KEY1->14  KEY2->16  KEY3->16  TMO ->8
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->0
 
 MSG 16  [EMERGENCY]
    | ATTENTION      |
    |                |
    | Staff Called   |
    | Help Coming    |
-   nav: KEY1->16  KEY2->17  KEY3->16  TMO ->16
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->16
 
-MSG 17  [READY]
+MSG 17  [DEFAULT]
    | System Ready   |
    |                |
    | Press Any Key  |
    | To Begin       |
-   nav: KEY1->17  KEY2->0  KEY3->16  TMO ->0
+   nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->0
 

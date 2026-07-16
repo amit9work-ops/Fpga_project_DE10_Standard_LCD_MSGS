@@ -3,87 +3,137 @@
 // Edit the message table / nav rules and regenerate.
 // ============================================================
 
-// action: 0=KEY1(next in cat) 1=KEY2(next cat) 2=KEY3(emergency) 3=TIMEOUT(script)
+// action: 0=KEY0(->EXERCISE) 1=KEY1(->SESSION) 2=KEY2(->EMERGENCY)
+//         3=KEY3(->DEFAULT, also the Emergency escape) 4=TIMEOUT(sequential)
+// KEY0-3 are FIXED jumps: next_index is the same for every cur_index.
+// TIMEOUT advances within the current category; Emergency's entry
+// sticks to itself; every other category's last entry falls to Default (0).
+// in_default: combinational, true while cur_index is a DEFAULT-category
+// message. The system-idle/sleep timer is armed only while this is set,
+// so an active Cat/Emergency slideshow can never be interrupted by sleep.
 module msg_nav_rom (
     input  wire [4:0] cur_index,
-    input  wire [1:0] action,
-    output reg  [4:0] next_index
+    input  wire [2:0] action,
+    output reg  [4:0] next_index,
+    output reg        in_default
 );
     always @(*) begin
         case ({cur_index, action})
-            7'd0: next_index = 5'd1;
-            7'd1: next_index = 5'd3;
-            7'd2: next_index = 5'd16;
-            7'd3: next_index = 5'd1;
-            7'd4: next_index = 5'd2;
-            7'd5: next_index = 5'd3;
-            7'd6: next_index = 5'd16;
-            7'd7: next_index = 5'd2;
-            7'd8: next_index = 5'd0;
-            7'd9: next_index = 5'd3;
-            7'd10: next_index = 5'd16;
-            7'd11: next_index = 5'd13;
-            7'd12: next_index = 5'd4;
-            7'd13: next_index = 5'd7;
-            7'd14: next_index = 5'd16;
-            7'd15: next_index = 5'd4;
-            7'd16: next_index = 5'd5;
-            7'd17: next_index = 5'd7;
-            7'd18: next_index = 5'd16;
-            7'd19: next_index = 5'd5;
-            7'd20: next_index = 5'd6;
-            7'd21: next_index = 5'd7;
-            7'd22: next_index = 5'd16;
-            7'd23: next_index = 5'd6;
-            7'd24: next_index = 5'd3;
-            7'd25: next_index = 5'd7;
-            7'd26: next_index = 5'd16;
-            7'd27: next_index = 5'd7;
-            7'd28: next_index = 5'd7;
-            7'd29: next_index = 5'd8;
-            7'd30: next_index = 5'd16;
-            7'd31: next_index = 5'd14;
-            7'd32: next_index = 5'd9;
-            7'd33: next_index = 5'd10;
-            7'd34: next_index = 5'd16;
-            7'd35: next_index = 5'd9;
-            7'd36: next_index = 5'd8;
-            7'd37: next_index = 5'd10;
-            7'd38: next_index = 5'd16;
-            7'd39: next_index = 5'd17;
-            7'd40: next_index = 5'd11;
-            7'd41: next_index = 5'd12;
-            7'd42: next_index = 5'd16;
-            7'd43: next_index = 5'd10;
-            7'd44: next_index = 5'd10;
-            7'd45: next_index = 5'd12;
-            7'd46: next_index = 5'd16;
-            7'd47: next_index = 5'd11;
-            7'd48: next_index = 5'd13;
-            7'd49: next_index = 5'd14;
-            7'd50: next_index = 5'd16;
-            7'd51: next_index = 5'd12;
-            7'd52: next_index = 5'd12;
-            7'd53: next_index = 5'd14;
-            7'd54: next_index = 5'd16;
-            7'd55: next_index = 5'd3;
-            7'd56: next_index = 5'd15;
-            7'd57: next_index = 5'd16;
-            7'd58: next_index = 5'd16;
-            7'd59: next_index = 5'd15;
-            7'd60: next_index = 5'd14;
-            7'd61: next_index = 5'd16;
-            7'd62: next_index = 5'd16;
-            7'd63: next_index = 5'd8;
-            7'd64: next_index = 5'd16;
-            7'd65: next_index = 5'd17;
-            7'd66: next_index = 5'd16;
-            7'd67: next_index = 5'd16;
-            7'd68: next_index = 5'd17;
-            7'd69: next_index = 5'd0;
-            7'd70: next_index = 5'd16;
-            7'd71: next_index = 5'd0;
+            8'd0: next_index = 5'd3;
+            8'd1: next_index = 5'd8;
+            8'd2: next_index = 5'd16;
+            8'd3: next_index = 5'd0;
+            8'd4: next_index = 5'd1;
+            8'd8: next_index = 5'd3;
+            8'd9: next_index = 5'd8;
+            8'd10: next_index = 5'd16;
+            8'd11: next_index = 5'd0;
+            8'd12: next_index = 5'd2;
+            8'd16: next_index = 5'd3;
+            8'd17: next_index = 5'd8;
+            8'd18: next_index = 5'd16;
+            8'd19: next_index = 5'd0;
+            8'd20: next_index = 5'd17;
+            8'd24: next_index = 5'd3;
+            8'd25: next_index = 5'd8;
+            8'd26: next_index = 5'd16;
+            8'd27: next_index = 5'd0;
+            8'd28: next_index = 5'd4;
+            8'd32: next_index = 5'd3;
+            8'd33: next_index = 5'd8;
+            8'd34: next_index = 5'd16;
+            8'd35: next_index = 5'd0;
+            8'd36: next_index = 5'd5;
+            8'd40: next_index = 5'd3;
+            8'd41: next_index = 5'd8;
+            8'd42: next_index = 5'd16;
+            8'd43: next_index = 5'd0;
+            8'd44: next_index = 5'd6;
+            8'd48: next_index = 5'd3;
+            8'd49: next_index = 5'd8;
+            8'd50: next_index = 5'd16;
+            8'd51: next_index = 5'd0;
+            8'd52: next_index = 5'd7;
+            8'd56: next_index = 5'd3;
+            8'd57: next_index = 5'd8;
+            8'd58: next_index = 5'd16;
+            8'd59: next_index = 5'd0;
+            8'd60: next_index = 5'd0;
+            8'd64: next_index = 5'd3;
+            8'd65: next_index = 5'd8;
+            8'd66: next_index = 5'd16;
+            8'd67: next_index = 5'd0;
+            8'd68: next_index = 5'd9;
+            8'd72: next_index = 5'd3;
+            8'd73: next_index = 5'd8;
+            8'd74: next_index = 5'd16;
+            8'd75: next_index = 5'd0;
+            8'd76: next_index = 5'd10;
+            8'd80: next_index = 5'd3;
+            8'd81: next_index = 5'd8;
+            8'd82: next_index = 5'd16;
+            8'd83: next_index = 5'd0;
+            8'd84: next_index = 5'd11;
+            8'd88: next_index = 5'd3;
+            8'd89: next_index = 5'd8;
+            8'd90: next_index = 5'd16;
+            8'd91: next_index = 5'd0;
+            8'd92: next_index = 5'd12;
+            8'd96: next_index = 5'd3;
+            8'd97: next_index = 5'd8;
+            8'd98: next_index = 5'd16;
+            8'd99: next_index = 5'd0;
+            8'd100: next_index = 5'd13;
+            8'd104: next_index = 5'd3;
+            8'd105: next_index = 5'd8;
+            8'd106: next_index = 5'd16;
+            8'd107: next_index = 5'd0;
+            8'd108: next_index = 5'd14;
+            8'd112: next_index = 5'd3;
+            8'd113: next_index = 5'd8;
+            8'd114: next_index = 5'd16;
+            8'd115: next_index = 5'd0;
+            8'd116: next_index = 5'd15;
+            8'd120: next_index = 5'd3;
+            8'd121: next_index = 5'd8;
+            8'd122: next_index = 5'd16;
+            8'd123: next_index = 5'd0;
+            8'd124: next_index = 5'd0;
+            8'd128: next_index = 5'd3;
+            8'd129: next_index = 5'd8;
+            8'd130: next_index = 5'd16;
+            8'd131: next_index = 5'd0;
+            8'd132: next_index = 5'd16;
+            8'd136: next_index = 5'd3;
+            8'd137: next_index = 5'd8;
+            8'd138: next_index = 5'd16;
+            8'd139: next_index = 5'd0;
+            8'd140: next_index = 5'd0;
             default: next_index = 5'd0;
+        endcase
+    end
+
+    always @(*) begin
+        case (cur_index)
+            5'd0: in_default = 1'b1;
+            5'd1: in_default = 1'b1;
+            5'd2: in_default = 1'b1;
+            5'd3: in_default = 1'b0;
+            5'd4: in_default = 1'b0;
+            5'd5: in_default = 1'b0;
+            5'd6: in_default = 1'b0;
+            5'd7: in_default = 1'b0;
+            5'd8: in_default = 1'b0;
+            5'd9: in_default = 1'b0;
+            5'd10: in_default = 1'b0;
+            5'd11: in_default = 1'b0;
+            5'd12: in_default = 1'b0;
+            5'd13: in_default = 1'b0;
+            5'd14: in_default = 1'b0;
+            5'd15: in_default = 1'b0;
+            5'd16: in_default = 1'b0;
+            5'd17: in_default = 1'b1;
+            default: in_default = 1'b0;
         endcase
     end
 endmodule

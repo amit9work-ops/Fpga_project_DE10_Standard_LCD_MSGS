@@ -1,9 +1,17 @@
 // ============================================================================
-// Testbench: tb_top_level
+// Testbench: tb_top_level (round 2, category-based navigation)
 // Project: DE10-Standard LCD Message System
 // Description: Standalone top-level verification for hw/rtl/top_level.v.
 //              Uses defparam overrides on the internal fpga_msg_controller
 //              instance to keep simulation runtime practical.
+//
+//              KEY[0] is wired to reset in top_level.v, so controller KEY0
+//              (EXERCISE) is not reachable here; this TB exercises KEY1/2/3
+//              (SESSION/EMERGENCY/DEFAULT) plus the per-message timer. Full
+//              navigation and sleep-timer coverage lives in the canonical
+//              tb_fpga_msg_controller.v -- this TB stays narrow: confirm the
+//              standalone wrapper elaborates and behaves for basic
+//              button/HEX/LED functionality.
 // ============================================================================
 
 `timescale 1ns / 1ps
@@ -39,10 +47,8 @@ module tb_top_level;
     );
 
     // Fast simulation overrides for internal controller instance.
-    // TIMEOUT_SEC=13 (rather than a single-digit value) deliberately
-    // exercises the widened seconds_remaining / HEX tens-digit division
-    // logic (13/10=1, 13%10=3) — a single-digit override would never
-    // catch a tens-digit regression.
+    // TIMEOUT_SEC is now the SLEEP timer only; the per-message timer always
+    // uses msg_duration_rom's real values (12, 10, 6, ... seconds).
     defparam dut.u_ctrl.CLK_FREQ_HZ = 1000;
     defparam dut.u_ctrl.DEBOUNCE_MS = 1;
     defparam dut.u_ctrl.TIMEOUT_SEC = 13;
@@ -91,7 +97,7 @@ module tb_top_level;
     always #(CLK_PERIOD_NS/2) CLOCK_50 = ~CLOCK_50;
 
     initial begin
-        $display("=== TB: top_level ===");
+        $display("=== TB: top_level (round 2) ===");
 
         // KEY are active-LOW: KEY[0]=reset
         KEY = 4'b1111;
@@ -100,43 +106,58 @@ module tb_top_level;
         KEY[0] = 1'b1;
         repeat (2) @(posedge CLOCK_50);
 
-        check(LEDR[4] == 1'b0, "Init timeout LED low");
         check(LEDR[3:0] == 4'b0000, "Init debounced LEDs low");
-        check(HEX2 == seven_seg(4'hF), "Init HEX2 shows F");
-        check(HEX5 == seven_seg(4'd1), "Init HEX5 shows timer tens");
-        check(HEX4 == seven_seg(4'd3), "Init HEX4 shows timer ones");
+        check(HEX2 == seven_seg(4'hF), "Init HEX2 shows F (no key yet)");
+        // msg_duration_rom[0] = 12s -> per-message timer HEX5:HEX4 = "12"
+        check(HEX5 == seven_seg(4'd1), "Init HEX5 shows msg0 duration tens (1)");
+        check(HEX4 == seven_seg(4'd2), "Init HEX4 shows msg0 duration ones (2)");
+        check(HEX0 == seven_seg(4'd0), "Init HEX0 message-number ones (index 0)");
+        check(HEX1 == seven_seg(4'd0), "Init HEX1 message-number tens (index 0)");
 
-        // Press KEY1 (bit1)
+        // Press KEY[1] -> controller KEY1 -> SESSION head (msg 8, duration 10s)
         KEY[1] = 1'b0;
         repeat (1010) @(posedge CLOCK_50);
         check(LEDR[1] == 1'b1, "KEY1 debounced reflected on LEDR[1]");
         check(HEX2 == seven_seg(4'd1), "HEX2 tracks last button KEY1");
+        check(HEX0 == seven_seg(4'd8), "HEX0 message-number shows SESSION head (8)");
 
         KEY[1] = 1'b1;
         repeat (1010) @(posedge CLOCK_50);
         check(LEDR[1] == 1'b0, "KEY1 release reflected on LEDR[1]");
+        // Debounce itself settles in ~3 cycles at these fast-sim parameters
+        // (DEBOUNCE_TICKS = (CLK_FREQ_HZ/1000)*DEBOUNCE_MS = 1), so both the
+        // press-hold and release-hold windows (1010 cycles each) elapse
+        // almost entirely AFTER the reload -- roughly two full 1000-cycle
+        // "seconds" have ticked by now, not one.
+        repeat (3) @(posedge CLOCK_50);
+        check(HEX5 == seven_seg(4'd0), "HEX5 shows msg8 duration tens (0)");
+        check(HEX4 == seven_seg(4'd8), "HEX4 shows msg8 duration ones-2 (8)");
 
-        // Wait for timeout (TIMEOUT_SEC seconds with fast params — this
-        // margin is a safe upper bound regardless of the exact remaining
-        // countdown value at this point)
-        repeat (13*1000 + 20) @(posedge CLOCK_50);
-        check(LEDR[4] == 1'b1, "Timeout LED asserted");
-        check(HEX5 == seven_seg(4'd0), "HEX5 shows timer tens zero on timeout");
-        check(HEX4 == seven_seg(4'd0), "HEX4 shows timer ones zero on timeout");
-
-        // Press KEY2 to reset timer and update last-button indicator
+        // Press KEY[2] -> controller KEY2 -> EMERGENCY head (msg 16, duration 6s)
         KEY[2] = 1'b0;
         repeat (1010) @(posedge CLOCK_50);
-        check(LEDR[4] == 1'b0, "Timeout cleared by key press");
         check(HEX2 == seven_seg(4'd2), "HEX2 tracks last button KEY2");
+        check(HEX0 == seven_seg(4'd6), "HEX0 message-number shows EMERGENCY head (16 mod 10 = 6)");
+        check(HEX1 == seven_seg(4'd1), "HEX1 message-number tens shows EMERGENCY head (16/10 = 1)");
 
         KEY[2] = 1'b1;
         repeat (1010) @(posedge CLOCK_50);
 
-        check(HEX0 == seven_seg(4'h0), "HEX0 reserved zero");
-        check(HEX1 == seven_seg(4'h0), "HEX1 reserved zero");
+        // Emergency is sticky: waiting past its own 6s duration must NOT
+        // advance the message index (only a key escapes it).
+        repeat (6*1000 + 50) @(posedge CLOCK_50);
+        check(HEX0 == seven_seg(4'd6), "Emergency (16) still shown after its duration elapses (sticky)");
+
+        // Press KEY[3] -> controller KEY3 -> DEFAULT head (msg 0), escaping Emergency
+        KEY[3] = 1'b0;
+        repeat (1010) @(posedge CLOCK_50);
+        check(HEX2 == seven_seg(4'd3), "HEX2 tracks last button KEY3");
+        check(HEX0 == seven_seg(4'h0), "KEY3 escapes Emergency back to DEFAULT (0)");
+        check(HEX1 == seven_seg(4'h0), "HEX1 reserved-looking zero at DEFAULT head");
         check(HEX3 == seven_seg(4'h0), "HEX3 reserved zero");
-        check(HEX5 == seven_seg(4'd1), "HEX5 timer tens digit");
+
+        KEY[3] = 1'b1;
+        repeat (1010) @(posedge CLOCK_50);
 
         $display("");
         $display("=== RESULTS: %0d PASSED, %0d FAILED out of %0d tests ===",

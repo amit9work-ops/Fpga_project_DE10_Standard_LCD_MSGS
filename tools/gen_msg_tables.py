@@ -9,9 +9,10 @@
 # dump can never drift from one another:
 #
 #   hw/rtl/msg_text_rom.v              generated text ROM  (index -> 512-bit)
-#   hw/rtl/msg_nav_rom.v               generated nav  ROM  ((index,action)->index)
+#   hw/rtl/msg_nav_rom.v               generated nav  ROM  ((index,action)->index),
+#                                      5 actions (KEY0/1/2/3, TIMEOUT), category-based
 #   hw/sim/testbenches/msg_text_golden.vh    fills golden_text[0:1151] (byte B=line*16+col)
-#   hw/sim/testbenches/msg_nav_golden.vh     fills golden_nav[0:71]    (idx*4+action)
+#   hw/sim/testbenches/msg_nav_golden.vh     fills golden_nav[0:89]    (idx*5+action)
 #   tools/msg_text.json                snapshot of the text (so this script keeps
 #                                      working after messages.h is deleted)
 #   tools/msg_golden_dump.txt          human-readable reference for the board diff
@@ -46,34 +47,35 @@ LINES     = 4
 COLS      = 16
 
 # ---------------------------------------------------------------------------
-# Navigation model  (see design note; adjust here, regenerate, everything follows)
+# Navigation model - round 2 (category-based, per advisor Eytan Mann's design):
+# each of the 4 keys jumps to a FIXED category head regardless of current
+# position; TIMEOUT advances sequentially within the current category; a
+# non-emergency category's last entry times out back to Default; Emergency's
+# entry times out to itself (sticky - only a key press escapes it).
+#
+# Category order below is (name, key_action, members). `members` lists the
+# display sequence for that category; members[0] is the head (KEY jump
+# target). Every one of the 18 messages must appear in exactly one category.
 # ---------------------------------------------------------------------------
-# Categories in display order; first element of each is the "category head".
 CATEGORIES = [
-    ("INTRO",     [0, 1, 2]),
-    ("EXERCISE",  [3, 4, 5, 6]),
-    ("REST",      [7]),
-    ("WAITING",   [8, 9]),
-    ("SAFETY",    [10, 11]),
-    ("STATUS",    [12, 13]),
-    ("DONE",      [14, 15]),
-    ("EMERGENCY", [16]),
-    ("READY",     [17]),
+    ("DEFAULT",  3, [0, 1, 2, 17]),                   # KEY3: welcome/credits, ending on "System Ready"
+    ("EXERCISE", 0, [3, 4, 5, 6, 7]),                  # KEY0: 4 exercises + rest
+    ("SESSION",  1, [8, 9, 10, 11, 12, 13, 14, 15]),   # KEY1: waiting/help/paused/active/done
+    ("EMERGENCY",2, [16]),                             # KEY2: attention/staff-called (sticky)
 ]
 
 # Action encoding must match message_fsm.v / msg_nav_rom.v.
-ACT_KEY1    = 0   # next within category
-ACT_KEY2    = 1   # jump to head of next category
-ACT_KEY3    = 2   # jump to emergency
-ACT_TIMEOUT = 3   # scripted session flow
+ACT_KEY0    = 0   # jump to EXERCISE head
+ACT_KEY1    = 1   # jump to SESSION head
+ACT_KEY2    = 2   # jump to EMERGENCY head
+ACT_KEY3    = 3   # jump to DEFAULT head (also the Emergency escape)
+ACT_TIMEOUT = 4   # sequential advance within the current category
 
-EMERGENCY_INDEX = 16
+DEFAULT_INDEX = 0  # DEFAULT category head; non-emergency category-end timeout target
 
-# Scripted idle flow (TIMEOUT). On-script messages auto-advance along this
-# cycle; messages NOT listed here are "sticky" (timeout -> self, i.e. they stay
-# until an operator presses a key). Safety/paused/emergency are intentionally
-# sticky and off the idle path so the display never auto-shows an alert.
-TIMEOUT_SCRIPT = [17, 0, 1, 2, 13, 3, 4, 5, 6, 7, 14, 15, 8, 9]  # cycles back to 17
+# name -> key action, for building the fixed jump table below.
+_CATEGORY_ACTION = {name: key_act for name, key_act, _ in CATEGORIES}
+_KEY_ACTIONS = (ACT_KEY0, ACT_KEY1, ACT_KEY2, ACT_KEY3)
 
 
 # ---------------------------------------------------------------------------
@@ -114,31 +116,33 @@ def load_text():
 # Build the navigation table
 # ---------------------------------------------------------------------------
 def build_nav():
-    index_to_cat = {}
-    cat_heads = []
-    for ci, (_, members) in enumerate(CATEGORIES):
-        cat_heads.append(members[0])
+    index_to_cat = {}          # idx -> (category_name, members list)
+    cat_head = {}               # category_name -> head index
+    for name, _key_act, members in CATEGORIES:
+        cat_head[name] = members[0]
         for idx in members:
-            index_to_cat[idx] = (ci, members)
-
-    # timeout: on-script -> next in cycle; off-script -> self (sticky)
-    timeout_next = {i: i for i in range(MSG_COUNT)}
-    n = len(TIMEOUT_SCRIPT)
-    for k, idx in enumerate(TIMEOUT_SCRIPT):
-        timeout_next[idx] = TIMEOUT_SCRIPT[(k + 1) % n]
+            index_to_cat[idx] = (name, members)
 
     nav = {}  # (index, action) -> next
     for idx in range(MSG_COUNT):
-        ci, members = index_to_cat[idx]
+        cat_name, members = index_to_cat[idx]
         pos = members.index(idx)
-        # KEY1: next within category (wrap inside category)
-        nav[(idx, ACT_KEY1)] = members[(pos + 1) % len(members)]
-        # KEY2: head of next category (wrap across categories)
-        nav[(idx, ACT_KEY2)] = cat_heads[(ci + 1) % len(CATEGORIES)]
-        # KEY3: straight to emergency
-        nav[(idx, ACT_KEY3)] = EMERGENCY_INDEX
-        # TIMEOUT: scripted flow / sticky
-        nav[(idx, ACT_TIMEOUT)] = timeout_next[idx]
+        is_last = (pos == len(members) - 1)
+
+        # The 4 key actions are FIXED jumps: identical target for every idx.
+        for name, key_act, members2 in CATEGORIES:
+            nav[(idx, key_act)] = members2[0]
+
+        # TIMEOUT: sequential within the category; at the last entry,
+        # Emergency sticks to itself, every other category falls back to
+        # DEFAULT's head.
+        if not is_last:
+            nav[(idx, ACT_TIMEOUT)] = members[pos + 1]
+        elif cat_name == "EMERGENCY":
+            nav[(idx, ACT_TIMEOUT)] = idx  # sticky, no auto exit
+        else:
+            nav[(idx, ACT_TIMEOUT)] = DEFAULT_INDEX
+
     return nav, index_to_cat
 
 
@@ -150,7 +154,7 @@ def die(msg):
     sys.exit(1)
 
 
-def self_check(msgs, nav):
+def self_check(msgs, nav, index_to_cat):
     if len(msgs) != MSG_COUNT:
         die(f"expected {MSG_COUNT} messages, got {len(msgs)}")
     for i, m in enumerate(msgs):
@@ -162,35 +166,72 @@ def self_check(msgs, nav):
             for ch in line:
                 if not (0x20 <= ord(ch) <= 0x7E):
                     die(f"message {i} line {l}: non-printable char {ch!r}")
+
+    # Every message assigned to exactly one category, all 18 covered.
+    all_members = []
+    for name, _key_act, members in CATEGORIES:
+        all_members.extend(members)
+    if sorted(all_members) != list(range(MSG_COUNT)):
+        die(f"category membership does not partition 0..{MSG_COUNT-1} exactly: {sorted(all_members)}")
+
+    # Exactly one DEFAULT and one EMERGENCY category (both are referenced by
+    # name elsewhere: DEFAULT for in_default/sleep-arming and the category-end
+    # fallback target, EMERGENCY for the sticky-timeout special case).
+    for required in ("DEFAULT", "EMERGENCY"):
+        n = sum(1 for name, _k, _m in CATEGORIES if name == required)
+        if n != 1:
+            die(f"expected exactly one {required} category, found {n}")
+    # Every key action (0-3) must be used by exactly one category.
+    key_acts = [key_act for _n, key_act, _m in CATEGORIES]
+    if sorted(key_acts) != [0, 1, 2, 3]:
+        die(f"category key actions must be exactly {{0,1,2,3}}, got {sorted(key_acts)}")
+
     for (idx, act), nxt in nav.items():
         if not (0 <= nxt < MSG_COUNT):
             die(f"nav({idx},{act}) -> {nxt} out of range")
-    # KEY3 from anywhere reaches emergency
-    for idx in range(MSG_COUNT):
-        if nav[(idx, ACT_KEY3)] != EMERGENCY_INDEX:
-            die(f"KEY3 from {idx} does not reach emergency")
-    # timeout on-script forms a closed cycle covering the script
-    seen = set()
-    cur = TIMEOUT_SCRIPT[0]
-    for _ in range(len(TIMEOUT_SCRIPT)):
-        seen.add(cur)
-        cur = nav[(cur, ACT_TIMEOUT)]
-    if cur != TIMEOUT_SCRIPT[0] or seen != set(TIMEOUT_SCRIPT):
-        die("timeout script is not a closed cycle over its members")
-    # every message reachable from 17 by some key sequence (BFS)
-    reach = {17}
-    frontier = [17]
+
+    # Fixed jump target: for each of the 4 key actions, next_index must be
+    # identical across every cur_index (this is the "jump to category head
+    # regardless of where you are" property the round-2 model depends on).
+    for name, key_act, members in CATEGORIES:
+        targets = {nav[(idx, key_act)] for idx in range(MSG_COUNT)}
+        if targets != {members[0]}:
+            die(f"key action {key_act} ({name}) is not a fixed jump to {members[0]}: got {targets}")
+
+    # Emergency's entry times out to itself (sticky).
+    for name, _key_act, members in CATEGORIES:
+        if name != "EMERGENCY":
+            continue
+        for idx in members:
+            if idx == members[-1] and nav[(idx, ACT_TIMEOUT)] != idx:
+                die(f"Emergency entry {idx} does not stick to itself on timeout")
+
+    # Every other category's last entry times out to DEFAULT_INDEX.
+    for name, _key_act, members in CATEGORIES:
+        if name == "EMERGENCY":
+            continue
+        last = members[-1]
+        if nav[(last, ACT_TIMEOUT)] != DEFAULT_INDEX:
+            die(f"category {name}'s last entry {last} does not time out to Default ({DEFAULT_INDEX})")
+
+    # Every message reachable from Default's head by some key sequence (BFS) -
+    # trivially true here since every category head is one keypress away, but
+    # kept as a regression guard against a future hand-edit breaking it.
+    reach = {DEFAULT_INDEX}
+    frontier = [DEFAULT_INDEX]
     while frontier:
         cur = frontier.pop()
-        for act in (ACT_KEY1, ACT_KEY2, ACT_KEY3, ACT_TIMEOUT):
+        for act in _KEY_ACTIONS + (ACT_TIMEOUT,):
             nxt = nav[(cur, act)]
             if nxt not in reach:
                 reach.add(nxt)
                 frontier.append(nxt)
     missing = set(range(MSG_COUNT)) - reach
     if missing:
-        die(f"messages unreachable from 17: {sorted(missing)}")
-    print("L1 self-checks passed: %d messages, %d nav entries." % (MSG_COUNT, len(nav)))
+        die(f"messages unreachable from Default ({DEFAULT_INDEX}): {sorted(missing)}")
+
+    print("L1 self-checks passed: %d messages, %d categories, %d nav entries." %
+          (MSG_COUNT, len(CATEGORIES), len(nav)))
 
 
 # ---------------------------------------------------------------------------
@@ -235,22 +276,43 @@ def emit_text_rom(msgs):
     write(os.path.join(RTL_DIR, "msg_text_rom.v"), "\n".join(lines) + "\n")
 
 
-def emit_nav_rom(nav):
+NUM_ACTIONS = 5  # KEY0, KEY1, KEY2, KEY3, TIMEOUT -> 3-bit action field
+
+
+def emit_nav_rom(nav, index_to_cat):
+    default_members = next(members for name, _k, members in CATEGORIES if name == "DEFAULT")
     lines = [GEN_BANNER]
-    lines.append("// action: 0=KEY1(next in cat) 1=KEY2(next cat) 2=KEY3(emergency) 3=TIMEOUT(script)")
+    lines.append("// action: 0=KEY0(->EXERCISE) 1=KEY1(->SESSION) 2=KEY2(->EMERGENCY)")
+    lines.append("//         3=KEY3(->DEFAULT, also the Emergency escape) 4=TIMEOUT(sequential)")
+    lines.append("// KEY0-3 are FIXED jumps: next_index is the same for every cur_index.")
+    lines.append("// TIMEOUT advances within the current category; Emergency's entry")
+    lines.append("// sticks to itself; every other category's last entry falls to Default (0).")
+    lines.append("// in_default: combinational, true while cur_index is a DEFAULT-category")
+    lines.append("// message. The system-idle/sleep timer is armed only while this is set,")
+    lines.append("// so an active Cat/Emergency slideshow can never be interrupted by sleep.")
     lines.append("module msg_nav_rom (")
     lines.append("    input  wire [4:0] cur_index,")
-    lines.append("    input  wire [1:0] action,")
-    lines.append("    output reg  [4:0] next_index")
+    lines.append("    input  wire [2:0] action,")
+    lines.append("    output reg  [4:0] next_index,")
+    lines.append("    output reg        in_default")
     lines.append(");")
     lines.append("    always @(*) begin")
     lines.append("        case ({cur_index, action})")
     for idx in range(MSG_COUNT):
-        for act in range(4):
-            key = (idx << 2) | act
+        for act in range(NUM_ACTIONS):
+            key = (idx << 3) | act
             nxt = nav[(idx, act)]
-            lines.append(f"            7'd{key}: next_index = 5'd{nxt};")
+            lines.append(f"            8'd{key}: next_index = 5'd{nxt};")
     lines.append("            default: next_index = 5'd0;")
+    lines.append("        endcase")
+    lines.append("    end")
+    lines.append("")
+    lines.append("    always @(*) begin")
+    lines.append("        case (cur_index)")
+    for idx in range(MSG_COUNT):
+        val = "1'b1" if idx in default_members else "1'b0"
+        lines.append(f"            5'd{idx}: in_default = {val};")
+    lines.append("            default: in_default = 1'b0;")
     lines.append("        endcase")
     lines.append("    end")
     lines.append("endmodule")
@@ -271,12 +333,13 @@ def emit_text_golden(msgs):
 
 
 def emit_nav_golden(nav):
-    # Fills golden_nav[0:71], entry idx*4+action.
+    # Fills golden_nav[0:89], entry idx*NUM_ACTIONS+action.
     out = ["// GENERATED by tools/gen_msg_tables.py - DO NOT EDIT.",
-           "// `include inside an initial block; fills reg [4:0] golden_nav[0:71]."]
+           "// `include inside an initial block; fills reg [4:0] golden_nav[0:%d]." %
+           (MSG_COUNT * NUM_ACTIONS - 1)]
     for idx in range(MSG_COUNT):
-        for act in range(4):
-            out.append("golden_nav[%d] = 5'd%d;" % (idx * 4 + act, nav[(idx, act)]))
+        for act in range(NUM_ACTIONS):
+            out.append("golden_nav[%d] = 5'd%d;" % (idx * NUM_ACTIONS + act, nav[(idx, act)]))
     write(os.path.join(TB_DIR, "msg_nav_golden.vh"), "\n".join(out) + "\n")
 
 
@@ -284,16 +347,20 @@ def emit_dump(msgs, nav, index_to_cat, source):
     lines = []
     lines.append("LCD message reference dump (generated from %s)" % source)
     lines.append("Byte order per message: line*16+col, lines 0..3.")
+    lines.append("Categories: " + ", ".join(
+        "%s (KEY%d -> head %d)" % (name, key_act, members[0]) if key_act < 4
+        else "%s" % name
+        for name, key_act, members in CATEGORIES
+    ))
     lines.append("")
-    act_name = {0: "KEY1", 1: "KEY2", 2: "KEY3", 3: "TMO "}
+    act_name = {0: "KEY0", 1: "KEY1", 2: "KEY2", 3: "KEY3", 4: "TMO "}
     for i, m in enumerate(msgs):
-        cat = index_to_cat[i][0]
-        catname = CATEGORIES[cat][0]
+        catname = index_to_cat[i][0]
         lines.append("MSG %2d  [%s]" % (i, catname))
         for l in range(LINES):
             lines.append("   |%s|" % m[l])
         nav_str = "  ".join(
-            "%s->%d" % (act_name[a], nav[(i, a)]) for a in range(4)
+            "%s->%d" % (act_name[a], nav[(i, a)]) for a in range(NUM_ACTIONS)
         )
         lines.append("   nav: %s" % nav_str)
         lines.append("")
@@ -309,10 +376,10 @@ def write(path, content):
 def main():
     msgs, source = load_text()
     nav, index_to_cat = build_nav()
-    self_check(msgs, nav)
+    self_check(msgs, nav, index_to_cat)
     print("Emitting artifacts (source: %s):" % source)
     emit_text_rom(msgs)
-    emit_nav_rom(nav)
+    emit_nav_rom(nav, index_to_cat)
     emit_text_golden(msgs)
     emit_nav_golden(nav)
     emit_dump(msgs, nav, index_to_cat, source)

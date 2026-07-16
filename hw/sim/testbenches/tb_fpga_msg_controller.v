@@ -1,14 +1,22 @@
 // ============================================================================
-// Testbench: tb_fpga_msg_controller
+// Testbench: tb_fpga_msg_controller (round 2, category-based navigation)
 // Project: DE10-Standard LCD Message System
 // Description: Full integration testbench for fpga_msg_controller.
 //              Stimulates KEY inputs and verifies:
 //              - btn_debounced outputs after debounce settling
 //              - btn_pulse single-cycle events
-//              - idle_timer countdown and timeout
+//              - each key jumps to its fixed category head
+//              - per-message timer reloads with THAT message's own duration
+//              - auto-advance within a category on per-message timeout
+//              - the system-idle (sleep) timer only fires while parked in
+//                DEFAULT, and never interrupts an active category slideshow
+//              - waking from SLEEP jumps directly to the pressed key's
+//                category head (one hop)
 //              - HEX display outputs
 //
 // Simulation shortcut: CLK_FREQ_HZ=1000, DEBOUNCE_MS=1, TIMEOUT_SEC=3
+// (TIMEOUT_SEC is now the SLEEP/system-idle timer; the per-message timer
+// always uses msg_duration_rom.v's real, unscaled per-message values).
 // ============================================================================
 
 `timescale 1ns / 1ps
@@ -20,7 +28,7 @@ module tb_fpga_msg_controller;
     // ----------------------------------------------------------------
     localparam CLK_FREQ_HZ = 1000;
     localparam DEBOUNCE_MS = 1;
-    localparam TIMEOUT_SEC = 3;
+    localparam TIMEOUT_SEC = 3;    // sleep timer only
     localparam NUM_BUTTONS = 4;
     localparam CLK_PERIOD  = 1_000_000;  // 1 ms in ns (1 kHz)
 
@@ -37,13 +45,13 @@ module tb_fpga_msg_controller;
     wire [5:0]             seconds_remaining;
     wire [2:0]             fsm_state;
     wire [4:0]             fsm_msg_index;
+    wire [511:0]           msg_text_bus;
+    wire [7:0]             msg_text_status;
     wire [6:0]             hex0, hex1, hex2, hex3, hex4, hex5;
 
     localparam [2:0] S_INIT  = 3'd0;
-    localparam [2:0] S_IDLE  = 3'd1;
-    localparam [2:0] S_HOME  = 3'd2;
-    localparam [2:0] S_MSG   = 3'd3;
-    localparam [2:0] S_SLEEP = 3'd4;
+    localparam [2:0] S_MSG   = 3'd1;
+    localparam [2:0] S_SLEEP = 3'd2;
 
     // ----------------------------------------------------------------
     // DUT
@@ -63,6 +71,8 @@ module tb_fpga_msg_controller;
         .seconds_remaining (seconds_remaining),
         .fsm_state         (fsm_state),
         .fsm_msg_index     (fsm_msg_index),
+        .msg_text_bus      (msg_text_bus),
+        .msg_text_status   (msg_text_status),
         .hex0              (hex0),
         .hex1              (hex1),
         .hex2              (hex2),
@@ -133,8 +143,8 @@ module tb_fpga_msg_controller;
     // Stimulus
     // ----------------------------------------------------------------
     initial begin
-        $display("=== TB: fpga_msg_controller (Integration) ===");
-        $display("CLK=%0d Hz, Debounce=%0d ms, Timeout=%0d s",
+        $display("=== TB: fpga_msg_controller (round 2, category nav) ===");
+        $display("CLK=%0d Hz, Debounce=%0d ms, Sleep timeout=%0d s",
                  CLK_FREQ_HZ, DEBOUNCE_MS, TIMEOUT_SEC);
 
         key_in = 4'b1111;  // All released (active-LOW)
@@ -146,149 +156,129 @@ module tb_fpga_msg_controller;
         repeat (2) @(posedge clk);
 
         // ============================================================
-        // TEST 1: Initial state — no debounced, no pulse
+        // TEST 1: Initial state — auto INIT->MSG at index 0 (DEFAULT head)
         // ============================================================
         check_bool(|btn_debounced, 1'b0, "Init debounced=0");
         check_bool(|btn_pulse,     1'b0, "Init pulse=0");
-        check_bool(timeout_flag,   1'b0, "Init no timeout");
-        check_bool(hex5 == seven_seg(4'd0), 1'b1, "Init HEX5 timer tens exact");
-        check_bool(hex4 == seven_seg(4'd3), 1'b1, "Init HEX4 timer ones exact");
-        check_bool(hex2 == seven_seg(4'hF), 1'b1, "Init HEX2 last key exact");
-        check_bool(fsm_state == S_IDLE, 1'b1, "Init FSM in IDLE");
+        check_bool(fsm_state == S_MSG, 1'b1, "Init: auto INIT->MSG");
+        check_bool(fsm_msg_index == 5'd0, 1'b1, "Init: msg_index is DEFAULT head (0)");
+        check_bool(hex2 == seven_seg(4'hF), 1'b1, "Init HEX2 last key exact (none)");
+        // msg_duration_rom[0] = 12s; timer loads it immediately (combinational
+        // load_value even through reset), before any ticks have elapsed.
+        check_bool(seconds_remaining == 6'd12, 1'b1, "Init: per-message timer loaded msg0 duration (12s)");
 
         // ============================================================
-        // TEST 2: Press KEY0 — debounce + edge detect
+        // TEST 2: KEY0 — jump to EXERCISE head (3)
         // ============================================================
         key_in[0] = 1'b0;  // Press KEY0 (active-LOW)
-
-        // Wait for debounce (2 sync + 1000 debounce ticks + margin)
-        repeat (1010) @(posedge clk);
+        repeat (1010) @(posedge clk);  // debounce settle (~1 tick past 1s)
 
         check_bool(btn_debounced[0], 1'b1, "KEY0 debounced");
+        check_bool(fsm_msg_index == 5'd3, 1'b1, "KEY0 jumps to EXERCISE head (3)");
+        check_bool(fsm_state == S_MSG, 1'b1, "Still in MSG after key jump");
         check_bool(hex2 == seven_seg(4'd0), 1'b1, "HEX2 shows last key=0");
-        check_bool(fsm_state == S_HOME, 1'b1, "FSM IDLE->HOME on first press");
-
-        // The pulse should have appeared about 1002 cycles after press
-        // By now it's gone — check that pulse is not stuck HIGH
         check_bool(btn_pulse[0], 1'b0, "Pulse auto-cleared");
 
-        // ============================================================
-        // TEST 3: Release KEY0
-        // ============================================================
+        // msg_duration_rom[3] = 8s; ~1 tick has already elapsed by now.
+        repeat (3) @(posedge clk);
+        check_bool(seconds_remaining == 6'd7, 1'b1, "Timer reloaded EXERCISE-head (msg3) duration (8s)");
+
         key_in[0] = 1'b1;  // Release
         repeat (1010) @(posedge clk);
-        check_bool(btn_debounced[0], 1'b0, "KEY0 released");
-        check_bool(fsm_state == S_HOME, 1'b1, "FSM remains HOME after release");
 
         // ============================================================
-        // TEST 4: Timer countdown
-        //   At 1000 Hz, 1 second = 1000 ticks
-        //   Timer should start from 3 (TIMEOUT_SEC)
+        // TEST 3: KEY1 — jump to SESSION head (8)
         // ============================================================
-        $display("  Waiting for timer countdown...");
-
-        // Timer was reset by the KEY0 press. Count 3 seconds + timeout second.
-        repeat (CLK_FREQ_HZ) @(posedge clk);
-        $display("  seconds_remaining=%0d (expect 2)", seconds_remaining);
-
-        repeat (CLK_FREQ_HZ) @(posedge clk);
-        $display("  seconds_remaining=%0d (expect 1)", seconds_remaining);
-
-        repeat (CLK_FREQ_HZ) @(posedge clk);
-        $display("  seconds_remaining=%0d (expect 0)", seconds_remaining);
-        check_bool(timeout_flag, 1'b1, "Timeout after countdown");
-        check_bool(hex5 == seven_seg(4'd0), 1'b1, "HEX5 zero tens exact on timeout");
-        check_bool(hex4 == seven_seg(4'd0), 1'b1, "HEX4 zero ones exact on timeout");
-        check_bool(fsm_state == S_SLEEP, 1'b1, "FSM HOME->SLEEP on timeout");
-
-        // ============================================================
-        // TEST 5: Press KEY1 — resets timer
-        // ============================================================
-        key_in[1] = 1'b0;  // Press KEY1
+        key_in[1] = 1'b0;
         repeat (1010) @(posedge clk);
-
-        check_bool(timeout_flag, 1'b0, "Timer reset by KEY1");
-        $display("  seconds_remaining=%0d (expect 2)", seconds_remaining);
+        check_bool(fsm_msg_index == 5'd8, 1'b1, "KEY1 jumps to SESSION head (8)");
         check_bool(hex2 == seven_seg(4'd1), 1'b1, "HEX2 shows last key=1");
-        check_bool(hex0 == seven_seg(4'd0), 1'b1, "HEX0 reserved exact");
-        check_bool(fsm_state == S_IDLE, 1'b1, "FSM SLEEP->IDLE on wake press");
 
-        key_in[1] = 1'b1;  // Release KEY1
-        repeat (1010) @(posedge clk);
-
-        // ============================================================
-        // TEST 6: HEX display exact values while running
-        // ============================================================
-        check_bool(hex4 == seven_seg(4'd1), 1'b1, "HEX4 timer ones exact one second after KEY1 reset");
-        check_bool(hex0 == seven_seg(4'd0), 1'b1, "HEX0 reserved exact");
-        check_bool(hex1 == seven_seg(4'd0), 1'b1, "HEX1 reserved exact");
-        check_bool(hex3 == seven_seg(4'd0), 1'b1, "HEX3 reserved exact");
-        check_bool(hex5 == seven_seg(4'd0), 1'b1, "HEX5 timer tens exact");
-
-        check_bool(pulse_width_errors == 0, 1'b1, "All pulses are single-cycle width");
-
-        // ============================================================
-        // TEST 7: Integrated FSM path (IDLE->HOME->MSG + index + duration
-        //          reload + auto-advance slideshow, per msg_duration_rom)
-        //   msg_duration_rom defaults used below: index 0 = 12s, index 1 = 10s
-        // ============================================================
-        key_in[2] = 1'b0;  // Press KEY2: IDLE -> HOME
-        repeat (1010) @(posedge clk);
-        check_bool(fsm_state == S_HOME, 1'b1, "FSM IDLE->HOME via KEY2");
-        key_in[2] = 1'b1;
-        repeat (1010) @(posedge clk);
-
-        key_in[2] = 1'b0;  // Press KEY2: HOME -> MSG
-        repeat (1010) @(posedge clk);
-        check_bool(fsm_state == S_MSG, 1'b1, "FSM HOME->MSG via KEY2");
-        check_bool(fsm_msg_index == 5'd0, 1'b1, "FSM index reset to 0 on MSG entry");
-
-        // Reload-timing check: entering MSG at index 0 should load the
-        // timer with msg_duration_rom[0] (12s). At these fast-sim
-        // debounce settings, debounce/reload lands almost immediately on
-        // the press, so the ~1010-cycle settle window itself amounts to
-        // just over one full "second" tick — one decrement (12->11) is
-        // expected and confirms a correct reload to 12, not a stale or
-        // wrong value (e.g. the global TIMEOUT_SEC=3 would already read 0).
         repeat (3) @(posedge clk);
-        check_bool(seconds_remaining == 6'd11, 1'b1, "Timer loaded msg0 duration");
-
-        key_in[2] = 1'b1;
-        repeat (1010) @(posedge clk);
-
-        key_in[1] = 1'b0;  // Press KEY1: MSG index ++
-        repeat (1010) @(posedge clk);
-        check_bool(fsm_state == S_MSG, 1'b1, "FSM stays in MSG on KEY1 next");
-        check_bool(fsm_msg_index == 5'd1, 1'b1, "FSM index increments in MSG");
-
-        // Reload-timing check (highest-risk behavior): navigating to a new
-        // message must reload the timer with THAT message's own duration
-        // (msg_duration_rom[1] = 10s), not the previous message's (12s).
-        // As above, the ~1010-cycle settle window amounts to just over one
-        // second, so one decrement (10->9) is expected — clearly distinct
-        // from what a stuck-on-msg0 bug would show (~11, from base 12).
-        repeat (3) @(posedge clk);
-        check_bool(seconds_remaining == 6'd9, 1'b1, "Timer reloaded msg1 duration");
+        check_bool(seconds_remaining == 6'd9, 1'b1, "Timer reloaded SESSION-head (msg8) duration (10s)");
 
         key_in[1] = 1'b1;
         repeat (1010) @(posedge clk);
 
-        // Wait the remainder of msg1's duration (10s) + margin: MSG
-        // auto-advances to the next message and stays in S_MSG (no sleep).
-        repeat (10*CLK_FREQ_HZ + 20) @(posedge clk);
-        check_bool(fsm_state == S_MSG, 1'b1, "FSM stays in MSG, auto-advance");
-        check_bool(fsm_msg_index == 5'd2, 1'b1, "FSM index auto-advances to 2");
-
-        // Return to HOME and confirm HOME's own inactivity timeout (fixed
-        // TIMEOUT_SEC, not a message duration) still reaches SLEEP.
-        key_in[0] = 1'b0;  // Press KEY0: MSG -> HOME
+        // ============================================================
+        // TEST 4: KEY2 — jump to EMERGENCY head (16)
+        // ============================================================
+        key_in[2] = 1'b0;
         repeat (1010) @(posedge clk);
-        check_bool(fsm_state == S_HOME, 1'b1, "FSM MSG->HOME via KEY0");
+        check_bool(fsm_msg_index == 5'd16, 1'b1, "KEY2 jumps to EMERGENCY head (16)");
+        check_bool(hex2 == seven_seg(4'd2), 1'b1, "HEX2 shows last key=2");
+
+        repeat (3) @(posedge clk);
+        check_bool(seconds_remaining == 6'd5, 1'b1, "Timer reloaded EMERGENCY (msg16) duration (6s)");
+
+        key_in[2] = 1'b1;
+        repeat (1010) @(posedge clk);
+
+        // ============================================================
+        // TEST 5: KEY3 — escape Emergency / jump to DEFAULT head (0)
+        // ============================================================
+        key_in[3] = 1'b0;
+        repeat (1010) @(posedge clk);
+        check_bool(fsm_msg_index == 5'd0, 1'b1, "KEY3 jumps to DEFAULT head (0), escaping Emergency");
+        check_bool(hex2 == seven_seg(4'd3), 1'b1, "HEX2 shows last key=3");
+        check_bool(hex0 == seven_seg(4'd0), 1'b1, "HEX0 message-number ones exact (index 0)");
+        check_bool(hex1 == seven_seg(4'd0), 1'b1, "HEX1 message-number tens exact (index 0)");
+
+        key_in[3] = 1'b1;
+        repeat (1010) @(posedge clk);
+
+        check_bool(pulse_width_errors == 0, 1'b1, "All pulses are single-cycle width (so far)");
+
+        // ============================================================
+        // TEST 6: Auto-advance within a category on per-message timeout
+        //   EXERCISE head (3) has an 8s duration; waiting it out with no
+        //   button must advance to 4 and stay in S_MSG.
+        // ============================================================
+        key_in[0] = 1'b0;  // KEY0 -> EXERCISE head (3)
+        repeat (1010) @(posedge clk);
+        check_bool(fsm_msg_index == 5'd3, 1'b1, "Re-entered EXERCISE at head (3)");
         key_in[0] = 1'b1;
         repeat (1010) @(posedge clk);
 
-        repeat (TIMEOUT_SEC*CLK_FREQ_HZ + 20) @(posedge clk); // HOME timeout -> SLEEP
-        check_bool(fsm_state == S_SLEEP, 1'b1, "FSM HOME->SLEEP on timeout");
+        // Wait out msg_duration_rom[3]=8s (a little over 1s has already
+        // elapsed since the reload; wait the remainder plus margin).
+        repeat (8*CLK_FREQ_HZ) @(posedge clk);
+        check_bool(fsm_state == S_MSG, 1'b1, "Still in MSG after category auto-advance");
+        check_bool(fsm_msg_index == 5'd4, 1'b1, "Auto-advanced 3->4 within EXERCISE");
+
+        // ============================================================
+        // TEST 7: Sleep timer must NOT fire mid-category, even past
+        //   TIMEOUT_SEC (3s), because msg4's own duration (10s) is longer
+        //   and in_default is false the whole time.
+        // ============================================================
+        repeat (TIMEOUT_SEC*CLK_FREQ_HZ + 50) @(posedge clk);
+        check_bool(fsm_state == S_MSG, 1'b1, "No sleep mid-category despite exceeding TIMEOUT_SEC");
+        check_bool(fsm_msg_index == 5'd4, 1'b1, "Index unchanged (msg4's 10s duration not yet elapsed)");
+
+        // ============================================================
+        // TEST 8: Sleep timer DOES fire once parked at DEFAULT and idle.
+        // ============================================================
+        key_in[3] = 1'b0;  // KEY3 -> DEFAULT head (0), also reloads sleep timer
+        repeat (1010) @(posedge clk);
+        check_bool(fsm_msg_index == 5'd0, 1'b1, "Back at DEFAULT (0) for sleep test");
+        key_in[3] = 1'b1;
+        repeat (1010) @(posedge clk);
+
+        repeat (TIMEOUT_SEC*CLK_FREQ_HZ + 50) @(posedge clk);
+        check_bool(fsm_state == S_SLEEP, 1'b1, "Idle at DEFAULT -> SLEEP after TIMEOUT_SEC");
+
+        // ============================================================
+        // TEST 9: Waking from SLEEP jumps directly to the pressed key's
+        //   category head (one hop, not back through DEFAULT first).
+        // ============================================================
+        key_in[1] = 1'b0;  // KEY1 -> SESSION head (8)
+        repeat (1010) @(posedge clk);
+        check_bool(fsm_state == S_MSG, 1'b1, "KEY1 wakes SLEEP -> MSG directly");
+        check_bool(fsm_msg_index == 5'd8, 1'b1, "Wake jumps straight to SESSION head (8)");
+        key_in[1] = 1'b1;
+        repeat (1010) @(posedge clk);
+
+        check_bool(pulse_width_errors == 0, 1'b1, "All pulses remained single-cycle width");
 
         // ============================================================
         // Summary

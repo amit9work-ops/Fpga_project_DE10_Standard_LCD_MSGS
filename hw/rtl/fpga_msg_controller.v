@@ -1,18 +1,20 @@
 // ============================================================================
 // Module: fpga_msg_controller
 // Project: DE10-Standard LCD Message System
-// Description: Top-level FPGA wrapper that integrates all custom modules:
+// Description: Top-level FPGA wrapper - ROUND 2 (category model). Integrates:
 //              - button_debouncer (20ms, 4-channel)
 //              - button_edge_detector (rising-edge pulse)
-//              - idle_timer (runtime-loaded countdown)
+//              - message_fsm (3-state: INIT/MSG/SLEEP, table-driven nav)
+//              - msg_nav_rom (category jump table + in_default flag)
 //              - msg_duration_rom (per-message duration lookup)
-//              - message_fsm (navigation + MSG-state auto-advance slideshow)
+//              - msg_text_rom + msg_text_export (wide bridge text interface)
+//              - TWO idle_timer instances:
+//                  1. per-message duration timer (always enabled; reloaded
+//                     from msg_duration_rom; drives auto-advance within a
+//                     category)
+//                  2. system-idle "sleep" timer (enabled only while
+//                     msg_nav_rom reports in_default; drives MSG->SLEEP)
 //              - hex_display (7-seg decoder for HEX0-5)
-//
-//              idle_timer's load_value is muxed by FSM state: HOME/IDLE use
-//              the fixed TIMEOUT_SEC (default 60s) inactivity timeout;
-//              MSG uses the current message's duration from msg_duration_rom,
-//              driving message_fsm's auto-advance slideshow behavior.
 //
 //              Outputs are exposed as conduit signals for connection to
 //              Avalon PIOs in Platform Designer (Qsys), readable by HPS
@@ -22,8 +24,8 @@
 module fpga_msg_controller #(
     parameter CLK_FREQ_HZ  = 50_000_000,
     parameter DEBOUNCE_MS  = 20,
-    parameter TIMEOUT_SEC  = 60,        // Home/idle inactivity timeout (S_MSG
-                                         // uses per-message duration instead)
+    parameter TIMEOUT_SEC  = 60,        // System-idle (sleep) timeout, armed
+                                         // only while parked in DEFAULT
     parameter NUM_BUTTONS  = 4,
     parameter SEC_CNT_W    = 6          // Width of seconds_remaining (0-63)
 )(
@@ -36,9 +38,9 @@ module fpga_msg_controller #(
     // ---- Outputs to PIO conduit exports (readable by HPS) ----
     output wire [NUM_BUTTONS-1:0]  btn_pulse,         // Single-cycle press events
     output wire [NUM_BUTTONS-1:0]  btn_debounced,     // Current debounced levels
-    output wire                    timeout_flag,       // Idle timer expired
-    output wire [SEC_CNT_W-1:0]    seconds_remaining,  // Countdown for display
-    output wire [2:0]              fsm_state,          // Verilog UI FSM state
+    output wire                    timeout_flag,       // Per-message timer expired
+    output wire [SEC_CNT_W-1:0]    seconds_remaining,  // Per-message countdown for display
+    output wire [2:0]              fsm_state,          // Verilog UI FSM state (0=INIT,1=MSG,2=SLEEP)
     output wire [4:0]              fsm_msg_index,      // Verilog UI FSM message index
 
     // ---- Wide message-text bridge interface (readable by HPS) ----
@@ -85,39 +87,43 @@ module fpga_msg_controller #(
 
     // ================================================================
     // Stage 3: Verilog UI FSM (project-critical control logic)
-    //   Instantiated before the timer so its outputs (fsm_state,
-    //   fsm_msg_index) are available combinationally to drive the
-    //   duration mux below. timeout_flag into the FSM must be a
-    //   single-cycle pulse (see msg_fsm_timeout_pulse), not the raw
-    //   idle_timer level, or MSG would auto-advance every cycle the
-    //   level stays high.
+    //   3 states: INIT/MSG/SLEEP. msg_timeout_flag and sleep_timeout_flag
+    //   into the FSM must each be single-cycle pulses (see the two
+    //   button_edge_detector(NUM_BUTTONS=1) instances below), not the raw
+    //   idle_timer levels, or the FSM would re-act every cycle the level
+    //   stays high.
     // ================================================================
-    localparam [2:0] FSM_S_MSG = 3'd3;  // must match message_fsm.v S_MSG
+    localparam [2:0] FSM_S_MSG = 3'd1;  // must match message_fsm.v S_MSG
 
-    wire msg_fsm_timeout_pulse;
-    wire [1:0] nav_action;        // FSM -> nav ROM
+    wire msg_timeout_pulse;
+    wire sleep_timeout_pulse;
+    wire [2:0] nav_action;        // FSM -> nav ROM
     wire [4:0] nav_next_index;    // nav ROM -> FSM
+    wire       in_default;        // nav ROM -> sleep-timer arming
 
     message_fsm #(
-        .MSG_COUNT (18),
-        .INDEX_W   (5)
+        .INDEX_W (5)
     ) u_message_fsm (
-        .clk           (clk),
-        .rst_n         (rst_n),
-        .btn_pulse     (btn_pulse),
-        .timeout_flag  (msg_fsm_timeout_pulse),
-        .nav_next_index(nav_next_index),
-        .state         (fsm_state),
-        .msg_index     (fsm_msg_index),
-        .nav_action    (nav_action)
+        .clk                (clk),
+        .rst_n              (rst_n),
+        .btn_pulse          (btn_pulse),
+        .msg_timeout_flag   (msg_timeout_pulse),
+        .sleep_timeout_flag (sleep_timeout_pulse),
+        .nav_next_index     (nav_next_index),
+        .state              (fsm_state),
+        .msg_index          (fsm_msg_index),
+        .nav_action         (nav_action)
     );
 
-    // Table-driven navigation: (current index, action) -> next index.
-    // Combinational, so nav_next_index is valid before the FSM's clock edge.
+    // Table-driven navigation: (current index, action) -> next index, plus
+    // in_default (true while fsm_msg_index is a DEFAULT-category message).
+    // Combinational, so nav_next_index/in_default are valid before the FSM's
+    // clock edge.
     msg_nav_rom u_msg_nav_rom (
         .cur_index  (fsm_msg_index),
         .action     (nav_action),
-        .next_index (nav_next_index)
+        .next_index (nav_next_index),
+        .in_default (in_default)
     );
 
     // ================================================================
@@ -146,55 +152,56 @@ module fpga_msg_controller #(
     );
 
     // ================================================================
-    // Stage 4: Per-message duration lookup + Idle Timer
-    //   load_value: HOME/IDLE use the fixed TIMEOUT_SEC inactivity
-    //   timeout; MSG uses the current message's duration so the timer
-    //   drives an auto-advance slideshow instead of sleeping.
+    // Stage 4a: Per-message duration timer
+    //   Always enabled; reloaded from msg_duration_rom for the current
+    //   message. Drives the FSM's TIMEOUT nav action (advance within the
+    //   current category, or fall back to DEFAULT / stick in EMERGENCY).
     //
-    //   reset_timer (timer_reload_strobe): fires on any button press
-    //   (one cycle after the FSM updates, since both are clocked off
-    //   the same edge, so fsm_state/fsm_msg_index already reflect the
-    //   NEW value by the time this reload lands — covers every
-    //   button-driven transition, including Home<->MSG and in-MSG
-    //   next/prev), OR when msg_index auto-advances while REMAINING in
-    //   S_MSG (the one transition with no button pulse to key off of).
-    //   Deliberately narrow: a plain state change into SLEEP (or any
-    //   other non-button transition) must NOT reload the timer, or the
-    //   just-asserted timeout would immediately clear itself again.
+    //   reset_timer (msg_timer_reload_strobe): fires on any button press
+    //   (one cycle after the FSM updates, since both are clocked off the
+    //   same edge, so fsm_msg_index already reflects the NEW value by the
+    //   time this reload lands), OR when msg_index auto-advances while
+    //   REMAINING in S_MSG (the one transition with no button pulse to key
+    //   off of). Deliberately narrow: a plain state change into SLEEP must
+    //   NOT reload the timer, or the just-asserted timeout would
+    //   immediately clear itself again.
     // ================================================================
     wire any_btn_pulse;
     assign any_btn_pulse = |btn_pulse;
 
-    wire timer_timeout_level;
+    wire msg_timer_timeout_level;
 
     button_edge_detector #(
         .NUM_BUTTONS (1)
-    ) u_timeout_edge (
+    ) u_msg_timeout_edge (
         .clk           (clk),
         .rst_n         (rst_n),
-        .btn_debounced (timer_timeout_level),
-        .btn_pulse     (msg_fsm_timeout_pulse)
+        .btn_debounced (msg_timer_timeout_level),
+        .btn_pulse     (msg_timeout_pulse)
     );
 
     reg [2:0]           fsm_state_d;
     reg [4:0]           fsm_msg_index_d;
     reg                 any_btn_pulse_d;
+    reg                 in_default_d;
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             fsm_state_d     <= 3'd0;
             fsm_msg_index_d <= 5'd0;
             any_btn_pulse_d <= 1'b0;
+            in_default_d    <= 1'b1;  // msg_index resets to 0, which is DEFAULT
         end else begin
             fsm_state_d     <= fsm_state;
             fsm_msg_index_d <= fsm_msg_index;
             any_btn_pulse_d <= any_btn_pulse;
+            in_default_d    <= in_default;
         end
     end
 
     wire msg_auto_advance_reload = (fsm_state   == FSM_S_MSG) &&
                                     (fsm_state_d == FSM_S_MSG) &&
                                     (fsm_msg_index != fsm_msg_index_d);
-    wire timer_reload_strobe = any_btn_pulse_d || msg_auto_advance_reload;
+    wire msg_timer_reload_strobe = any_btn_pulse_d || msg_auto_advance_reload;
 
     wire [SEC_CNT_W-1:0] msg_duration_value;
     msg_duration_rom #(
@@ -206,29 +213,65 @@ module fpga_msg_controller #(
         .duration_sec (msg_duration_value)
     );
 
-    wire [SEC_CNT_W-1:0] timer_load_value =
-        (fsm_state == FSM_S_MSG) ? msg_duration_value : TIMEOUT_SEC[SEC_CNT_W-1:0];
+    idle_timer #(
+        .CLK_FREQ_HZ (CLK_FREQ_HZ),
+        .SEC_CNT_W   (SEC_CNT_W)
+    ) u_msg_timer (
+        .clk               (clk),
+        .rst_n             (rst_n),
+        .reset_timer       (msg_timer_reload_strobe),
+        .enable            (1'b1),
+        .load_value        (msg_duration_value),
+        .timeout           (msg_timer_timeout_level),
+        .seconds_remaining (seconds_remaining)
+    );
+
+    assign timeout_flag = msg_timer_timeout_level;  // exported level, per-message timer
+
+    // ================================================================
+    // Stage 4b: System-idle ("sleep") timer
+    //   Enabled only while in_default is true, so an active Exercise/
+    //   Session/Emergency slideshow can never be interrupted by sleep.
+    //   Reloaded fresh (a) on any button press (activity resets idle), or
+    //   (b) the instant msg_index transitions INTO the DEFAULT category
+    //   (a rising edge on in_default) -- covers both an explicit KEY3 press
+    //   and arriving at DEFAULT via a category-end timeout fallback, so the
+    //   idle window always starts counting from the moment DEFAULT is
+    //   actually reached rather than resuming a stale paused count.
+    // ================================================================
+    wire in_default_rising = in_default && !in_default_d;
+    wire sleep_timer_reload_strobe = any_btn_pulse_d || in_default_rising;
+
+    wire sleep_timer_timeout_level;
+    wire [SEC_CNT_W-1:0] sleep_seconds_remaining_unused;
 
     idle_timer #(
         .CLK_FREQ_HZ (CLK_FREQ_HZ),
         .SEC_CNT_W   (SEC_CNT_W)
-    ) u_timer (
+    ) u_sleep_timer (
         .clk               (clk),
         .rst_n             (rst_n),
-        .reset_timer       (timer_reload_strobe),
-        .enable            (1'b1),
-        .load_value        (timer_load_value),
-        .timeout           (timer_timeout_level),
-        .seconds_remaining (seconds_remaining)
+        .reset_timer       (sleep_timer_reload_strobe),
+        .enable            (in_default),
+        .load_value        (TIMEOUT_SEC[SEC_CNT_W-1:0]),
+        .timeout           (sleep_timer_timeout_level),
+        .seconds_remaining (sleep_seconds_remaining_unused)
     );
 
-    assign timeout_flag = timer_timeout_level;  // exported level, unchanged contract
+    button_edge_detector #(
+        .NUM_BUTTONS (1)
+    ) u_sleep_timeout_edge (
+        .clk           (clk),
+        .rst_n         (rst_n),
+        .btn_debounced (sleep_timer_timeout_level),
+        .btn_pulse     (sleep_timeout_pulse)
+    );
 
     // ================================================================
     // Stage 5: HEX Display
     //   HEX5: Timer tens digit
     //   HEX4: Timer ones digit
-    //   HEX2: Last button pressed (0–3, F=none)
+    //   HEX2: Last button pressed (0-3, F=none)
     //   HEX0/1/3: Reserved (show 0)
     // ================================================================
     // Encode which button was last pressed (priority: KEY0 > KEY1 > KEY2 > KEY3)
@@ -253,7 +296,7 @@ module fpga_msg_controller #(
     assign timer_ones_digit = seconds_remaining % 10;
 
     // Current message number (0-17), shown only while a message is
-    // actually displayed; reads 00 in HOME/IDLE/SLEEP.
+    // actually displayed; reads 00 in INIT/SLEEP.
     wire [3:0] msg_tens_digit = (fsm_state == FSM_S_MSG) ? (fsm_msg_index / 10) : 4'h0;
     wire [3:0] msg_ones_digit = (fsm_state == FSM_S_MSG) ? (fsm_msg_index % 10) : 4'h0;
 
