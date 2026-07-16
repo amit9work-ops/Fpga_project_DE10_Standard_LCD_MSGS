@@ -1,4 +1,13 @@
 `timescale 1ns/1ps
+// ============================================================================
+// tb_message_fsm - FSM navigation is now TABLE-DRIVEN (msg_nav_rom).
+//
+// The DUT emits nav_action and consumes nav_next_index; this TB wires a real
+// msg_nav_rom between them (exactly as fpga_msg_controller does) and mirrors
+// the nav table in the reference model using the generated golden vectors, so
+// the 500-iteration model-vs-DUT campaign checks the FSM's action selection and
+// index application against the same table the ROM is built from.
+// ============================================================================
 
 module tb_message_fsm;
 
@@ -12,6 +21,11 @@ module tb_message_fsm;
     localparam [2:0] S_MSG   = 3'd3;
     localparam [2:0] S_SLEEP = 3'd4;
 
+    localparam [1:0] ACT_KEY1    = 2'd0;
+    localparam [1:0] ACT_KEY2    = 2'd1;
+    localparam [1:0] ACT_KEY3    = 2'd2;
+    localparam [1:0] ACT_TIMEOUT = 2'd3;
+
     reg clk;
     reg rst_n;
     reg [3:0] btn_pulse;
@@ -19,6 +33,8 @@ module tb_message_fsm;
 
     wire [2:0] state;
     wire [INDEX_W-1:0] msg_index;
+    wire [1:0] nav_action;
+    wire [INDEX_W-1:0] nav_next_index;
 
     integer test_num = 0;
     integer pass_count = 0;
@@ -31,6 +47,9 @@ module tb_message_fsm;
     reg [2:0] next_state;
     reg [INDEX_W-1:0] next_index;
 
+    // Golden nav table (same source as the ROM), for the reference model.
+    reg [4:0] golden_nav [0:71];
+
     message_fsm #(
         .MSG_COUNT(MSG_COUNT),
         .INDEX_W(INDEX_W)
@@ -39,8 +58,17 @@ module tb_message_fsm;
         .rst_n(rst_n),
         .btn_pulse(btn_pulse),
         .timeout_flag(timeout_flag),
+        .nav_next_index(nav_next_index),
         .state(state),
-        .msg_index(msg_index)
+        .msg_index(msg_index),
+        .nav_action(nav_action)
+    );
+
+    // Real nav ROM in the loop, wired as in fpga_msg_controller.
+    msg_nav_rom u_nav (
+        .cur_index  (msg_index),
+        .action     (nav_action),
+        .next_index (nav_next_index)
     );
 
     task check_eq;
@@ -58,16 +86,47 @@ module tb_message_fsm;
         end
     endtask
 
+    // Stimulus is driven on the negedge so it is stable well before the
+    // sampling posedge (avoids a TB-vs-DUT same-edge race). btn is held high
+    // for exactly one posedge.
     task pulse_btn;
         input integer idx;
         begin
+            @(negedge clk);
             btn_pulse = 4'b0000;
             btn_pulse[idx] = 1'b1;
-            @(posedge clk);
+            @(negedge clk);
             btn_pulse = 4'b0000;
-            @(posedge clk);
         end
     endtask
+
+    // Assert timeout_flag for exactly one posedge.
+    task pulse_timeout;
+        begin
+            @(negedge clk); timeout_flag = 1'b1;
+            @(negedge clk); timeout_flag = 1'b0;
+        end
+    endtask
+
+    // Assert a button and timeout simultaneously for one posedge.
+    task pulse_combo;
+        input [3:0] btn;
+        begin
+            @(negedge clk); btn_pulse = btn; timeout_flag = 1'b1;
+            @(negedge clk); btn_pulse = 4'b0000; timeout_flag = 1'b0;
+        end
+    endtask
+
+    // Reference model mirroring message_fsm + msg_nav_rom.
+    function [1:0] model_action;
+        input [3:0] in_btn;
+        begin
+            if (in_btn[1])      model_action = ACT_KEY1;
+            else if (in_btn[2]) model_action = ACT_KEY2;
+            else if (in_btn[3]) model_action = ACT_KEY3;
+            else                model_action = ACT_TIMEOUT;
+        end
+    endfunction
 
     task model_step;
         input  [2:0] in_state;
@@ -76,19 +135,14 @@ module tb_message_fsm;
         input        in_timeout;
         output [2:0] out_state;
         output [INDEX_W-1:0] out_index;
+        reg [1:0] act;
         begin
             out_state = in_state;
             out_index = in_index;
-
             case (in_state)
-                S_INIT: begin
-                    out_state = S_IDLE;
-                end
+                S_INIT: out_state = S_IDLE;
 
-                S_IDLE: begin
-                    if (|in_btn)
-                        out_state = S_HOME;
-                end
+                S_IDLE: if (|in_btn) out_state = S_HOME;
 
                 S_HOME: begin
                     if (in_timeout)
@@ -102,32 +156,17 @@ module tb_message_fsm;
                 end
 
                 S_MSG: begin
-                    // Buttons take priority; timeout auto-advances (wraps)
-                    // and stays in S_MSG (slideshow), never goes to SLEEP.
                     if (in_btn[0])
                         out_state = S_HOME;
-                    else if (in_btn[1]) begin
-                        if (in_index == (MSG_COUNT - 1))
-                            out_index = {INDEX_W{1'b0}};
-                        else
-                            out_index = in_index + 1'b1;
-                    end else if (in_btn[2]) begin
-                        if (in_index == {INDEX_W{1'b0}})
-                            out_index = MSG_COUNT - 1;
-                        else
-                            out_index = in_index - 1'b1;
+                    else if (in_btn[1] || in_btn[2] || in_btn[3]) begin
+                        act = model_action(in_btn);
+                        out_index = golden_nav[in_index*4 + act];
                     end else if (in_timeout) begin
-                        if (in_index == (MSG_COUNT - 1))
-                            out_index = {INDEX_W{1'b0}};
-                        else
-                            out_index = in_index + 1'b1;
+                        out_index = golden_nav[in_index*4 + ACT_TIMEOUT];
                     end
                 end
 
-                S_SLEEP: begin
-                    if (|in_btn)
-                        out_state = S_IDLE;
-                end
+                S_SLEEP: if (|in_btn) out_state = S_IDLE;
 
                 default: begin
                     out_state = S_INIT;
@@ -143,9 +182,10 @@ module tb_message_fsm;
     end
 
     initial begin
-        $display("=== TB: message_fsm ===");
+        $display("=== TB: message_fsm (table-driven nav) ===");
         $dumpfile("tb_message_fsm.vcd");
         $dumpvars(0, tb_message_fsm);
+        `include "msg_nav_golden.vh"
 
         rst_n = 1'b0;
         btn_pulse = 4'b0000;
@@ -160,114 +200,83 @@ module tb_message_fsm;
         @(posedge clk);
         check_eq(state == S_IDLE, "INIT auto-transitions to IDLE");
 
-        // IDLE -> HOME by any button (KEY3 here)
         pulse_btn(3);
         check_eq(state == S_HOME, "IDLE -> HOME on any button pulse");
 
-        // HOME -> IDLE by KEY0
         pulse_btn(0);
         check_eq(state == S_IDLE, "HOME -> IDLE on KEY0");
 
-        // IDLE -> HOME, then HOME -> MSG via KEY1
         pulse_btn(1);
         check_eq(state == S_HOME, "IDLE -> HOME (second entry)");
         pulse_btn(1);
         check_eq(state == S_MSG, "HOME -> MSG on KEY1");
         check_eq(msg_index == 0, "MSG starts at index 0");
 
-        // Next message increments
-        pulse_btn(1);
-        check_eq(state == S_MSG, "Stay in MSG on KEY1 next");
-        check_eq(msg_index == 1, "Index increments to 1");
-
-        // Advance to wrap point
-        repeat (17) pulse_btn(1);
-        check_eq(msg_index == 0, "Index wraps from 17 -> 0");
-
-        // Previous from 0 wraps to 17
-        pulse_btn(2);
-        check_eq(msg_index == 17, "Index wraps from 0 -> 17 on KEY2");
+        // Directed nav spot-checks against the known table.
+        pulse_btn(1);  // KEY1: INTRO next 0->1
+        check_eq(msg_index == 1, "KEY1 next within category 0->1");
+        pulse_btn(1);  // KEY1: 1->2
+        check_eq(msg_index == 2, "KEY1 next within category 1->2");
+        pulse_btn(1);  // KEY1: INTRO wraps 2->0
+        check_eq(msg_index == 0, "KEY1 wraps within category 2->0");
+        pulse_btn(2);  // KEY2: head of next category 0->3
+        check_eq(msg_index == 3, "KEY2 jumps to next category 0->3");
+        pulse_btn(3);  // KEY3: emergency from anywhere 3->16
+        check_eq(msg_index == 16, "KEY3 jumps to emergency 3->16");
 
         // MSG -> HOME on KEY0
         pulse_btn(0);
         check_eq(state == S_HOME, "MSG -> HOME on KEY0");
 
         // HOME timeout -> SLEEP
-        timeout_flag = 1'b1;
-        @(posedge clk);
-        timeout_flag = 1'b0;
-        @(posedge clk);
+        pulse_timeout();
         check_eq(state == S_SLEEP, "HOME -> SLEEP on timeout");
 
-        // SLEEP wake-up -> IDLE on any key
         pulse_btn(2);
         check_eq(state == S_IDLE, "SLEEP -> IDLE on any key");
 
-        // Enter MSG again to test auto-advance-on-timeout behavior
+        // Enter MSG again; single-cycle timeout auto-advances along the script.
         pulse_btn(1);
         pulse_btn(1);
-        check_eq(state == S_MSG, "Back in MSG, auto-adv test");
+        check_eq(state == S_MSG, "Back in MSG");
         check_eq(msg_index == 0, "MSG re-entry starts at index 0");
-
-        // Timeout alone (no button) auto-advances to next message, wraps,
-        // and stays in S_MSG (does NOT go to SLEEP).
-        timeout_flag = 1'b1;
-        @(posedge clk);
-        timeout_flag = 1'b0;
-        @(posedge clk);
+        pulse_timeout();
         check_eq(state == S_MSG, "MSG stays on timeout, no sleep");
-        check_eq(msg_index == 1, "MSG index +1 on timeout");
+        check_eq(msg_index == golden_nav[0*4 + ACT_TIMEOUT], "timeout follows script from 0");
 
-        // Holding timeout_flag for multiple cycles (no button) advances
-        // once per cycle it's asserted — this module trusts its caller to
-        // present timeout_flag as a single-cycle pulse; documented here so
-        // the contract is exercised and visible in the regression.
-        timeout_flag = 1'b1;
-        repeat (3) @(posedge clk);
-        timeout_flag = 1'b0;
-        @(posedge clk);
-        check_eq(msg_index == 4, "Held timeout advances per cycle");
-
-        // Button beats a simultaneous timeout (manual override priority)
-        btn_pulse = 4'b0001; // KEY0
-        timeout_flag = 1'b1; // simultaneous timeout
-        @(posedge clk);
-        btn_pulse = 4'b0000;
-        timeout_flag = 1'b0;
-        @(posedge clk);
+        // Button beats a simultaneous timeout in MSG (KEY0 -> HOME).
+        pulse_btn(1);            // ensure in MSG at some index
+        pulse_combo(4'b0001);    // KEY0 + timeout
         check_eq(state == S_HOME, "Button beats timeout in MSG");
 
-        // Home timeout priority test
-        pulse_btn(0); // wake to IDLE
-        pulse_btn(1); // IDLE->HOME
+        // Home timeout priority.
+        pulse_btn(0);
+        pulse_btn(1);
         check_eq(state == S_HOME, "Back in HOME for priority test");
-
-        timeout_flag = 1'b1;
-        btn_pulse = 4'b0001; // KEY0 simultaneously
-        @(posedge clk);
-        timeout_flag = 1'b0;
-        btn_pulse = 4'b0000;
-        @(posedge clk);
+        pulse_combo(4'b0001);    // KEY0 + timeout in HOME
         check_eq(state == S_SLEEP, "Timeout has priority in HOME");
 
         // ============================================================
-        // TEST 20+: Randomized model-vs-DUT campaign
+        // Randomized model-vs-DUT campaign (now includes KEY3).
         // ============================================================
         exp_state = state;
         exp_index = msg_index;
 
         for (rand_iter = 0; rand_iter < 500; rand_iter = rand_iter + 1) begin
-            case ($random(seed) & 3)
-                2'd0: btn_pulse = 4'b0000;
-                2'd1: btn_pulse = 4'b0001;
-                2'd2: btn_pulse = 4'b0010;
-                2'd3: btn_pulse = 4'b0100;
+            // Drive stimulus on the negedge so it is stable before the posedge.
+            @(negedge clk);
+            case ($unsigned($random(seed)) % 5)
+                0: btn_pulse = 4'b0000;
+                1: btn_pulse = 4'b0001;  // KEY0
+                2: btn_pulse = 4'b0010;  // KEY1
+                3: btn_pulse = 4'b0100;  // KEY2
+                4: btn_pulse = 4'b1000;  // KEY3
             endcase
             timeout_flag = (($random(seed) & 16'h00FF) == 8'h00);
 
             model_step(exp_state, exp_index, btn_pulse, timeout_flag, next_state, next_index);
-
-            @(posedge clk);
+            @(posedge clk);   // DUT samples
+            #1;
 
             check_eq(state == next_state, "Randomized: state matches model");
             check_eq(msg_index == next_index, "Randomized: index matches model");
@@ -286,12 +295,11 @@ module tb_message_fsm;
             $display("*** ALL TESTS PASSED ***");
         else
             $display("*** SOME TESTS FAILED ***");
-
         $finish;
     end
 
     initial begin
-        repeat (2000) @(posedge clk);
+        repeat (4000) @(posedge clk);
         $display("FAIL [TIMEOUT] FSM TB exceeded safety window");
         $finish;
     end

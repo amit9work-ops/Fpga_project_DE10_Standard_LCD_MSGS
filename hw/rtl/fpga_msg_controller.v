@@ -41,6 +41,13 @@ module fpga_msg_controller #(
     output wire [2:0]              fsm_state,          // Verilog UI FSM state
     output wire [4:0]              fsm_msg_index,      // Verilog UI FSM message index
 
+    // ---- Wide message-text bridge interface (readable by HPS) ----
+    output wire [511:0]            msg_text_bus,       // registered snapshot of current
+                                                        // message: byte B=line*16+col at
+                                                        // [B*8 +: 8]. Top level slices this
+                                                        // into 16 x 32-bit text PIOs.
+    output wire [7:0]              msg_text_status,    // {seq[2:0], text_index[4:0]}
+
     // ---- HEX display outputs (active-LOW 7-segment) ----
     output wire [6:0]              hex0,
     output wire [6:0]              hex1,
@@ -88,17 +95,54 @@ module fpga_msg_controller #(
     localparam [2:0] FSM_S_MSG = 3'd3;  // must match message_fsm.v S_MSG
 
     wire msg_fsm_timeout_pulse;
+    wire [1:0] nav_action;        // FSM -> nav ROM
+    wire [4:0] nav_next_index;    // nav ROM -> FSM
 
     message_fsm #(
         .MSG_COUNT (18),
         .INDEX_W   (5)
     ) u_message_fsm (
-        .clk         (clk),
-        .rst_n       (rst_n),
-        .btn_pulse   (btn_pulse),
-        .timeout_flag(msg_fsm_timeout_pulse),
-        .state       (fsm_state),
-        .msg_index   (fsm_msg_index)
+        .clk           (clk),
+        .rst_n         (rst_n),
+        .btn_pulse     (btn_pulse),
+        .timeout_flag  (msg_fsm_timeout_pulse),
+        .nav_next_index(nav_next_index),
+        .state         (fsm_state),
+        .msg_index     (fsm_msg_index),
+        .nav_action    (nav_action)
+    );
+
+    // Table-driven navigation: (current index, action) -> next index.
+    // Combinational, so nav_next_index is valid before the FSM's clock edge.
+    msg_nav_rom u_msg_nav_rom (
+        .cur_index  (fsm_msg_index),
+        .action     (nav_action),
+        .next_index (nav_next_index)
+    );
+
+    // ================================================================
+    // Message text ROM + snapshot export for the wide bridge interface
+    //   The text ROM is combinational on the FSM index; msg_text_export
+    //   registers the text and the index together so the exported pair
+    //   is always consistent, and provides the seqlock sequence counter.
+    // ================================================================
+    wire [511:0] msg_text_rom_bus;
+    msg_text_rom u_msg_text_rom (
+        .msg_index (fsm_msg_index),
+        .text_out  (msg_text_rom_bus)
+    );
+
+    msg_text_export #(
+        .INDEX_W (5)
+    ) u_msg_text_export (
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .msg_index  (fsm_msg_index),
+        .text_in    (msg_text_rom_bus),
+        .text_out   (msg_text_bus),
+        .text_index (),                 // index echoed inside status_out
+        .seq        (),
+        .status_out (msg_text_status)
     );
 
     // ================================================================

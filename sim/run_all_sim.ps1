@@ -78,7 +78,9 @@ function Invoke-Sim {
     $out = "$RESULTS\$Name.vvp"
 
     # --- Compile ---
-    $compileOut = & iverilog -g2012 -Wall -o $out @Sources 2>&1
+    # -I $TBH so testbench `include of generated golden vectors (msg_*_golden.vh)
+    # resolves regardless of the compiler's working directory.
+    $compileOut = & iverilog -g2012 -Wall -I $TBH -o $out @Sources 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  [COMPILE FAIL]" -ForegroundColor Red
         $compileOut | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
@@ -149,10 +151,29 @@ Invoke-Sim "tb_hex_display" @(
     "$RTL\hex_display.v"
 )
 
-# --- TC-5: message_fsm (Verilog control FSM) ---
+# --- TC-5: message_fsm (Verilog control FSM, table-driven nav) ---
 Invoke-Sim "tb_message_fsm" @(
     "$TBH\tb_message_fsm.v",
-    "$RTL\message_fsm.v"
+    "$RTL\message_fsm.v",
+    "$RTL\msg_nav_rom.v"
+)
+
+# --- TC-5a: msg_text_rom (byte-exact vs generated golden) ---
+Invoke-Sim "tb_msg_text_rom" @(
+    "$TBH\tb_msg_text_rom.v",
+    "$RTL\msg_text_rom.v"
+)
+
+# --- TC-5b: msg_nav_rom (all 72 nav vectors vs golden) ---
+Invoke-Sim "tb_msg_nav_rom" @(
+    "$TBH\tb_msg_nav_rom.v",
+    "$RTL\msg_nav_rom.v"
+)
+
+# --- TC-5c: msg_text_export (snapshot + seqlock) ---
+Invoke-Sim "tb_msg_text_export" @(
+    "$TBH\tb_msg_text_export.v",
+    "$RTL\msg_text_export.v"
 )
 
 # =============================================================================
@@ -169,6 +190,9 @@ Invoke-Sim "tb_fpga_msg_controller" @(
     "$RTL\fpga_msg_controller.v",
     "$RTL\message_fsm.v",
     "$RTL\msg_duration_rom.v",
+    "$RTL\msg_nav_rom.v",
+    "$RTL\msg_text_rom.v",
+    "$RTL\msg_text_export.v",
     "$RTL\button_debouncer.v",
     "$RTL\button_edge_detector.v",
     "$RTL\idle_timer.v",
@@ -187,6 +211,9 @@ Invoke-Sim "tb_top_level" @(
     "$RTL\fpga_msg_controller.v",
     "$RTL\message_fsm.v",
     "$RTL\msg_duration_rom.v",
+    "$RTL\msg_nav_rom.v",
+    "$RTL\msg_text_rom.v",
+    "$RTL\msg_text_export.v",
     "$RTL\button_debouncer.v",
     "$RTL\button_edge_detector.v",
     "$RTL\idle_timer.v",
