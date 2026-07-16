@@ -258,14 +258,32 @@ module fpga_msg_controller #(
         .seconds_remaining (sleep_seconds_remaining_unused)
     );
 
-    button_edge_detector #(
-        .NUM_BUTTONS (1)
-    ) u_sleep_timeout_edge (
-        .clk           (clk),
-        .rst_n         (rst_n),
-        .btn_debounced (sleep_timer_timeout_level),
-        .btn_pulse     (sleep_timeout_pulse)
-    );
+    // Fed to the FSM as a LEVEL, not an edge-pulse (unlike msg_timeout_pulse
+    // above). Both timers share the same clk and are phase-locked to the
+    // same 1-second grid (every per-message reload lands on a whole-second
+    // boundary), so the message timer's periodic timeout and this timer's
+    // one-shot 60s timeout CAN land on the identical cycle. message_fsm's
+    // priority ladder deliberately lets msg_timeout win that cycle (don't
+    // cut a message short) -- but a one-shot edge-pulse here would be
+    // silently dropped on the losing cycle and never reissued: reset_timer
+    // above only re-arms on a button press or on freshly *arriving* at
+    // DEFAULT, neither of which happens while auto-cycling within DEFAULT.
+    // That would permanently disable sleep for the rest of that dwell. A
+    // level stays asserted until consumed, so the SLEEP transition just
+    // lands one cycle late instead of being lost. Safe specifically because
+    // entering S_SLEEP is idempotent -- unlike a msg_index advance, which
+    // must stay single-shot (see msg_timeout_pulse, which stays edge-based).
+    //
+    // Also masked with in_default: on wake (S_SLEEP -> S_MSG on any key),
+    // this level can still read stale-high for a cycle or two until the
+    // deferred any_btn_pulse_d-driven reload above actually clears it
+    // (that reload is intentionally 1 cycle behind, same as the message
+    // timer's). Without this mask, S_MSG's priority ladder would see
+    // sleep_timeout_flag still asserted immediately after waking into a
+    // non-DEFAULT category and bounce straight back into S_SLEEP. in_default
+    // already drops to 0 the same cycle msg_index leaves DEFAULT, closing
+    // that gap regardless of how many cycles the underlying reload takes.
+    assign sleep_timeout_pulse = sleep_timer_timeout_level && in_default;
 
     // ================================================================
     // Stage 5: HEX Display

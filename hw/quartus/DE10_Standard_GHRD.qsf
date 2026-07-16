@@ -1018,8 +1018,6 @@ set_global_assignment -name VERILOG_FILE ip/edge_detect/altera_edge_detector.v
 set_global_assignment -name QIP_FILE soc_system/synthesis/soc_system.qip
 
 # --- Fix: Missing Qsys-generated error adapter submodules ---
-set_global_assignment -name SYSTEMVERILOG_FILE soc_system/synthesis/submodules/soc_system_mm_interconnect_0_avalon_st_adapter_error_adapter_0.sv
-set_global_assignment -name SYSTEMVERILOG_FILE soc_system/synthesis/submodules/soc_system_mm_interconnect_3_avalon_st_adapter_error_adapter_0.sv
 
 # --- Fix: Search paths for HPS SDRAM memory controller IP atoms ---
 set_global_assignment -name SEARCH_PATH "C:/intelFPGA_lite/21.1/ip/altera/alt_mem_if/alt_mem_if_controllers/altera_mem_if_hard_memory_controller"

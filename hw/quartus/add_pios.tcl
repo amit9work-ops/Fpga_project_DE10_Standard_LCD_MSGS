@@ -17,11 +17,19 @@ load_system soc_system.qsys
 
 # ---------------------------------------------------------
 # Pin the LW bridge address space so adding slaves cannot silently renumber
-# the existing ones. 12 bits = 4 KB (0x000-0xFFF): ample headroom for the
-# existing PIOs (0x0100-0x0150) plus the message-text window (0x0400-0x0500).
+# the existing ones. Verified against the full mm_bridge_0.m0 slave list in
+# soc_system.qsys (not just the small PIOs): jtag_uart.avalon_jtag_slave
+# sits at 0x00020000, far above the 0x0000-0x0510 range everything else
+# uses. 18 bits = 256 KB (0x00000-0x3FFFF) comfortably covers jtag_uart's
+# 0x20000-0x20007 plus the existing PIOs (0x0100-0x0150) and the
+# message-text window (0x0400-0x0500), with headroom to spare. (An earlier
+# version of this script pinned 12 bits/4 KB, which fit the PIOs but was
+# too small to reach jtag_uart and made qsys-generate fail outright:
+# "jtag_uart.avalon_jtag_slave (0x20000..0x20007) is outside the master's
+# address range (0x0..0xfff)".)
 # ---------------------------------------------------------
 set_instance_parameter_value mm_bridge_0 USE_AUTO_ADDRESS_WIDTH 0
-set_instance_parameter_value mm_bridge_0 ADDRESS_WIDTH 12
+set_instance_parameter_value mm_bridge_0 ADDRESS_WIDTH 18
 
 # ---------------------------------------------------------
 # Helper: create an Input PIO if absent, connect clk/reset/s1, set its base
