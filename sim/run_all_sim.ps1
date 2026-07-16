@@ -176,6 +176,12 @@ Invoke-Sim "tb_msg_text_export" @(
     "$RTL\msg_text_export.v"
 )
 
+# --- TC-5d: msg_duration_rom (previously untested) ---
+Invoke-Sim "tb_msg_duration_rom" @(
+    "$TBH\tb_msg_duration_rom.v",
+    "$RTL\msg_duration_rom.v"
+)
+
 # =============================================================================
 # PHASE 2 — Integration test (full fpga_msg_controller)
 # =============================================================================
@@ -199,9 +205,35 @@ Invoke-Sim "tb_fpga_msg_controller" @(
     "$RTL\hex_display.v"
 )
 
-# --- TC-6: SoC register packing contract ---
+# --- TC-5e: sleep/msg-timer collision regression (see file header for the
+#     two bugs this proves are fixed) ---
+Invoke-Sim "tb_fpga_msg_controller_sleep_collision" @(
+    "$TBH\tb_fpga_msg_controller_sleep_collision.v",
+    "$RTL\fpga_msg_controller.v",
+    "$RTL\message_fsm.v",
+    "$RTL\msg_duration_rom.v",
+    "$RTL\msg_nav_rom.v",
+    "$RTL\msg_text_rom.v",
+    "$RTL\msg_text_export.v",
+    "$RTL\button_debouncer.v",
+    "$RTL\button_edge_detector.v",
+    "$RTL\idle_timer.v",
+    "$RTL\hex_display.v"
+)
+
+# --- TC-6: SoC register packing contract (now against a real DUT) ---
 Invoke-Sim "tb_soc_register_contract" @(
-    "$TBH\tb_soc_register_contract.v"
+    "$TBH\tb_soc_register_contract.v",
+    "$RTL\fpga_msg_controller.v",
+    "$RTL\message_fsm.v",
+    "$RTL\msg_duration_rom.v",
+    "$RTL\msg_nav_rom.v",
+    "$RTL\msg_text_rom.v",
+    "$RTL\msg_text_export.v",
+    "$RTL\button_debouncer.v",
+    "$RTL\button_edge_detector.v",
+    "$RTL\idle_timer.v",
+    "$RTL\hex_display.v"
 )
 
 # --- TC-7: top_level standalone integration ---

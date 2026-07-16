@@ -44,6 +44,7 @@ BUILD_IN_PROGRESS.md
 
 # HPS compiled
 sw/hps_app/*.o
+sw/hps_app/*.d
 sw/hps_app/lcd_msg_app
 sw/hps_app/main
 

@@ -120,7 +120,7 @@ Verilog was drafted with Claude Code, and the HPS C application with Codex. No c
 | Bridge reliability | 0 errors / 10,000 reads | 0 |
 | Button debounce | 0 false triggers | 0 |
 
-Eleven canonical testbenches (`tb_button_debouncer`, `tb_button_edge_detector`, `tb_idle_timer`, `tb_hex_display`, `tb_message_fsm`, `tb_msg_text_rom`, `tb_msg_nav_rom`, `tb_msg_text_export`, `tb_fpga_msg_controller`, `tb_soc_register_contract`, `tb_top_level`) required zero errors before any module reached hardware — including a 500-iteration randomized model-vs-DUT campaign for the FSM and a directed seqlock-tearing attack for the wide text interface.
+Thirteen canonical testbenches (`tb_button_debouncer`, `tb_button_edge_detector`, `tb_idle_timer`, `tb_hex_display`, `tb_message_fsm`, `tb_msg_text_rom`, `tb_msg_nav_rom`, `tb_msg_text_export`, `tb_msg_duration_rom`, `tb_fpga_msg_controller`, `tb_fpga_msg_controller_sleep_collision`, `tb_soc_register_contract`, `tb_top_level`) required zero errors before any module reached hardware — including a 500-iteration randomized model-vs-DUT campaign for the FSM, a directed seqlock-tearing attack for the wide text interface, and a directed regression proving the two-timer sleep/message-timeout collision fixes. `tb_soc_register_contract` instantiates the real controller RTL rather than re-declaring its packing formula, so a wiring regression is caught in simulation, not just on the board.
 
 ## Repository Structure
 
