@@ -6,7 +6,7 @@ MSG  0  [DEFAULT]
    | Amit Damari    |
    |                |
    | Ido Zylberman  |
-   | 8 August 2026  |
+   | 3 August 2026  |
    nav: KEY0->3  KEY1->8  KEY2->16  KEY3->0  TMO ->1
 
 MSG  1  [DEFAULT]
