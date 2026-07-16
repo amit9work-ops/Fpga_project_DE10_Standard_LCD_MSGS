@@ -1035,6 +1035,9 @@ set_global_assignment -name VERILOG_FILE ../../rtl/idle_timer.v
 set_global_assignment -name VERILOG_FILE ../../rtl/hex_display.v
 set_global_assignment -name VERILOG_FILE ../../rtl/message_fsm.v
 set_global_assignment -name VERILOG_FILE ../../rtl/msg_duration_rom.v
+set_global_assignment -name VERILOG_FILE ../../rtl/msg_nav_rom.v
+set_global_assignment -name VERILOG_FILE ../../rtl/msg_text_rom.v
+set_global_assignment -name VERILOG_FILE ../../rtl/msg_text_export.v
 set_global_assignment -name VERILOG_FILE ../../rtl/fpga_msg_controller.v
 
 set_global_assignment -name ENABLE_SIGNALTAP ON

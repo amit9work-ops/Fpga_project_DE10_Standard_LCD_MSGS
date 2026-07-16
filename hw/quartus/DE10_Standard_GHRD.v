@@ -495,6 +495,8 @@ fpga_msg_controller #(
     .seconds_remaining (ctrl_seconds_remaining),
     .fsm_state         (ctrl_fsm_state),
     .fsm_msg_index     (ctrl_fsm_msg_index),
+    .msg_text_bus      (ctrl_msg_text_bus),
+    .msg_text_status   (ctrl_msg_text_status),
     .hex0              (hex0_out),
     .hex1              (hex1_out),
     .hex2              (hex2_out),
