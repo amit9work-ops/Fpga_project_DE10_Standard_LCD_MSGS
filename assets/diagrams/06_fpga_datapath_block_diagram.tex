@@ -1,4 +1,4 @@
-\documentclass[tikz, border=10pt]{standalone}
+\documentclass[border=10pt]{standalone}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
@@ -28,15 +28,44 @@
 \definecolor{ArrowGray}{HTML}{717D7E}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc, decorations.pathreplacing, bending, shadows.blur}
+
+% One legend entry: a short arrow sample drawn in the caller's style, then its
+% meaning.
+\newcommand{\arrkey}[2]{%
+  \tikz[baseline=-0.55ex]{\draw[-{Latex[length=1.7mm,width=1.3mm]},#1]
+    (0,0) -- (0.62,0);}~#2}
+
+% Pipeline-stage badge. The SAME numbers are used in three places on purpose:
+% the book's Section 4.1 prose, the badges on this figure, and the stage
+% comments in fpga_msg_controller.v. A reader can walk 1..5 across all three.
+\newcommand{\stg}[1]{%
+  \tikz[baseline=-0.6ex]{\node[circle, fill=IntelBlue, text=white,
+    font=\tiny\bfseries, inner sep=0.6pt, minimum size=3.7mm] {#1};}}
+
 \begin{document}
+% ROUND 2 datapath, synced from the book's Figure 4.1 (project_book_REVISED).
+% Adds, versus the round-1 drawing: msg_nav_rom (the category jump table the
+% FSM navigates by), msg_text_rom + msg_text_export (message text now lives
+% in fabric and crosses the bridge), and the second idle_timer instance (the
+% system-idle "sleep" timer, enabled only while msg_nav_rom reports
+% in_default). The single "Countdown Timer" of round 1 is relabelled
+% "Per-Message Timer" to disambiguate it from the sleep timer.
 \begin{tikzpicture}[
   every node/.style={font=\small\sffamily},
   pip/.style={rectangle, rounded corners=4pt,
     draw=green!60!black, fill=green!12,
     minimum width=2.0cm, minimum height=1.1cm,
     align=center, font=\small\bfseries},
+  romsty/.style={rectangle, rounded corners=4pt,
+    draw=MsgBorder, fill=MsgFill,
+    minimum width=2.0cm, minimum height=1.1cm,
+    align=center, font=\small\bfseries},
   tim/.style={rectangle, rounded corners=4pt,
     draw=red!70!black, fill=red!10,
+    minimum width=2.0cm, minimum height=1.1cm,
+    align=center, font=\small\bfseries},
+  slp/.style={rectangle, rounded corners=4pt,
+    draw=SleepBorder, fill=SleepFill,
     minimum width=2.0cm, minimum height=1.1cm,
     align=center, font=\small\bfseries},
   ext/.style={rectangle, rounded corners=4pt,
@@ -45,71 +74,187 @@
     align=center, font=\small\bfseries},
   hps/.style={rectangle, rounded corners=4pt,
     draw=blue!70!black, fill=blue!10,
-    minimum width=2.2cm, minimum height=2.0cm,
+    minimum width=2.2cm, minimum height=2.4cm,
     align=center, font=\small\bfseries},
   bridgebox/.style={rectangle, rounded corners=3pt,
     draw=blue!70!black, fill=white,
     inner xsep=3pt, inner ysep=2pt,
     align=center, font=\scriptsize\itshape\color{blue!70!black}},
+  piobank/.style={rectangle, rounded corners=4pt,
+    draw=blue!70!black, fill=blue!8,
+    minimum width=2.5cm, minimum height=4.4cm,
+    align=center, font=\small\bfseries},
+  grp/.style={rectangle, rounded corners=6pt,
+    draw=black!35, dashed, line width=0.7pt, fill=black!4,
+    inner sep=0.38cm},
+  grplbl/.style={font=\scriptsize\itshape\color{black!60},
+    inner sep=2pt},
   arr/.style={-{Latex[length=2.5mm,width=1.8mm]},
     draw=black!70, line width=1.0pt},
+  % The spine is the path the reader should follow first, so it is the
+  % heaviest line on the drawing.
+  spine/.style={arr, line width=1.6pt, draw=black!80},
+  % Dashed means "this returns to the FSM". Colour still says which subsystem
+  % it came from, so the two codings are independent.
+  fbk/.style={dash pattern=on 2.4pt off 1.7pt},
   darr/.style={-{Latex[length=2.5mm,width=1.8mm]},
     draw=blue!70!black, line width=1.1pt},
   tarr/.style={-{Latex[length=2.5mm,width=1.8mm]},
     draw=red!80!black, line width=1.2pt},
+  navarr/.style={-{Latex[length=2.5mm,width=1.8mm]},
+    draw=MsgBorder, line width=1.1pt},
+  slparr/.style={-{Latex[length=2.5mm,width=1.8mm]},
+    draw=SleepBorder, line width=1.1pt},
   lbl/.style={font=\scriptsize\sffamily, fill=white, inner sep=1pt},
+  % Tap dots mark where a bus is branched rather than broken. At 3.4pt they
+  % vanished once the whole picture was scaled down, which made the branches
+  % look like they started at the neighbouring block.
+  jdot/.style={circle, fill=black!80, inner sep=0pt, minimum size=5.2pt},
+  jdotb/.style={jdot, fill=blue!70!black},
+  % Step badge. Numbers are taken from the stage comments in
+  % fpga_msg_controller.v, so the figure cannot drift from the code.
+  badge/.style={circle, fill=IntelBlue, text=white,
+    font=\scriptsize\bfseries, inner sep=0.8pt, minimum size=5.4mm},
 ]
 
-\node[ext] (keys) at (0.0,  0) {\shortstack{KEY[3:0]\\board pins}};
-\node[pip] (deb)  at (3.1,  0) {\shortstack{Debouncer\\20\,ms}};
-\node[pip] (edg)  at (6.2,  0) {\shortstack{Edge\\Detector}};
-\node[pip] (fsm)  at (9.3,  0) {\shortstack{Message\\FSM}};
-\node[pip] (hex)  at (12.4, 0) {\shortstack{HEX\\Display}};
+% ===== Stage 1: input conditioning (left) =====
+\node[ext, minimum width=1.8cm] (keys) at (-0.4, 0) {\shortstack{KEY[3:0]\\board pins}};
+\node[pip, minimum width=1.8cm] (deb)  at (2.4, 0) {\shortstack{Debouncer\\20\,ms}};
+\node[pip, minimum width=1.8cm] (edg)  at (5.2, 0) {\shortstack{Edge\\Detector}};
 
-\node[hps] (hps) at (19.0, -1.6) {\shortstack{HPS\\ARM Linux\\LCD app}};
+% ===== Stage 2: navigation, control and timing (middle) =====
+% The FSM is deliberately wider than the other blocks: it needs three
+% separate taps on its top face and two on its bottom face, and crowding
+% them onto a 2 cm face is what made the earlier revision hard to read.
+\node[pip, minimum width=3.4cm, minimum height=1.4cm] (fsm) at (10.0, 0)
+  {\shortstack{Message\\FSM}};
+\node[romsty, minimum width=2.4cm] (nav) at (9.4,  3.6)
+  {\shortstack{Msg Nav ROM\\\scriptsize category table}};
+\node[slp]    (slp) at (14.2, 3.6)  {\shortstack{Sleep\\Timer}};
+\node[romsty, minimum width=2.2cm] (dur) at (10.4, -3.6)
+  {\shortstack{Msg Duration\\ROM}};
+\node[tim, minimum width=2.6cm] (tmr) at (14.2, -3.6)
+  {\shortstack{Per-Message\\Timer}};
 
-\node[bridgebox] (bridgepio) at (16.1,-1.6)
-  {\shortstack{via LW\\Bridge\\(PIO)}};
+% ===== Stage 3: message text path (right) =====
+\node[romsty, minimum width=2.2cm] (trom) at (17.8, 0) {\shortstack{Msg Text\\ROM}};
+\node[romsty, minimum width=2.8cm] (texp) at (21.4, 0)
+  {\shortstack{Text Export\\\scriptsize + seqlock}};
 
-\node[tim] (tmr) at (9.3,  -3.6) {\shortstack{Countdown\\Timer}};
-\node[pip] (rom) at (13.7, -3.6) {\shortstack{Msg Duration\\ROM}};
+% ===== Board display output (outside the control group) =====
+\node[ext, minimum width=2.2cm] (hex) at (17.8, -3.6)
+  {\shortstack{HEX5:HEX0\\\scriptsize board 7-seg}};
 
-\draw[arr] (keys.east) -- node[lbl,above]{raw}    (deb.west);
-\draw[arr] (deb.east)  -- node[lbl,above]{stable} (edg.west);
-\draw[arr] (edg.east)  -- node[lbl,above]{pulse}  (fsm.west);
-\draw[arr] (fsm.east)  -- node[lbl,above]{state}  (hex.west);
+% ===== PIO register bank + HPS =====
+\node[piobank] (pio) at (25.8, 0)
+  {\shortstack{PIO\\Register\\Bank\\[2pt]\scriptsize read-only}};
+\node[hps] (hps) at (29.2, 0) {\shortstack{HPS\\ARM Linux\\LCD app}};
 
-% timeout: Countdown Timer -> Message FSM (clean vertical, left of centre)
-\draw[tarr] ([xshift=-3mm]tmr.north) -- ([xshift=-3mm]fsm.south);
-\node[lbl,left] at (8.9,-1.9) {timeout};
+% ---- lookup labels are placed beside their arrows, never on top of them,
+%      and are pulled into the Stage 2 fit box so the box grows to hold them.
+\node[lbl, anchor=east] (navlbla) at (8.65, 1.9) {\shortstack[r]{index\\+ action}};
+\node[lbl, anchor=west] (navlblb) at (10.15, 1.2) {\shortstack[l]{next\\index}};
 
-% any press: Edge Detector -> Countdown Timer (orthogonal, into west edge)
-\draw[tarr] (edg.south) -- (6.2,-3.6) -- (tmr.west);
-\node[lbl] at (6.2,-2.0) {any press};
+% ---- step badges: the five pipeline stages, numbered exactly as the RTL
+%      numbers them. The ROMs carry no badge because they are lookup tables
+%      serving a stage, not stages in their own right.
+\node[badge] at (deb.north west) {1};
+\node[badge] at (edg.north west) {2};
+\node[badge] at (fsm.north west) {3};
+\node[badge] at (tmr.north west) {4a};
+\node[badge] at (slp.north west) {4b};
+\node[badge] at (hex.north west) {5};
 
-% index: Message FSM -> Msg Duration ROM (orthogonal, right of the timeout arrow)
-\draw[arr] ([xshift=5mm]fsm.south) -- (9.8,-1.5) -- (13.7,-1.5) -- (rom.north);
-\node[lbl,right] at (9.9,-1.15) {index};
+% ---- hierarchical grouping: one box per stage ----
+\begin{scope}[on background layer]
+  % Functional regions, deliberately NOT called "stages": the RTL and the text
+  % already number five pipeline stages (debounce, edge detect, FSM, timers,
+  % HEX), and reusing the word here for a coarser grouping contradicted both.
+  \node[grp, fit=(keys)(deb)(edg),
+        label={[grplbl]above:input conditioning}] {};
+  \node[grp, fit=(nav)(slp)(fsm)(dur)(tmr)(navlbla)(navlblb),
+        label={[grplbl]above left:navigation, control and timing}] {};
+  \node[grp, fit=(trom)(texp),
+        label={[grplbl]above:message text path}] {};
+\end{scope}
 
-% load value: Msg Duration ROM -> Countdown Timer (horizontal)
-\draw[tarr] (rom.west) -- node[lbl,above]{load value} (tmr.east);
+% ---- fabric / HPS boundary ----
+% Trimmed to the height of the actual content: sized for the older, taller
+% layout it now overshot the blocks and left a stray band at the top right.
+\draw[dashed, draw=blue!70!black, line width=0.9pt] (27.6, -5.8) -- (27.6, 4.5);
+\node[bridgebox] at (27.6, 2.9) {\shortstack{Lightweight\\HPS--FPGA\\Bridge}};
 
-% state + index: HEX Display -> HPS over the Lightweight Bridge
-\draw[darr]
-  (hex.east)
-  -- (17.1,  0.0)
-  -- (17.1, -1.05)
-  -- ($(hps.west)+(0, 0.55)$);
-\node[lbl,above] at (15.3, 0.0) {state\,+\,index};
+% ---- main left-to-right spine: one unbroken line, left edge to right edge ----
+\draw[spine] (keys.east) -- node[lbl,above]{raw}    (deb.west);
+\draw[spine] (deb.east)  -- node[lbl,above]{stable} (edg.west);
+\draw[spine] (edg.east)  -- node[lbl,above]{pulse}  (fsm.west);
+\draw[spine] (fsm.east)  -- node[lbl,above,pos=0.62]{index}  (trom.west);
+\draw[navarr] (trom.east) -- node[lbl,above]{\shortstack{512-bit\\text}} (texp.west);
+\draw[darr] (texp.east) -- node[lbl,above,pos=0.5]{\shortstack{16 words\\+ status}} (pio.west);
+\draw[darr] (pio.east) -- node[lbl,above]{reads} (hps.west);
 
-% seconds remaining: Countdown Timer -> HPS over the Lightweight Bridge
-\draw[darr]
-  (tmr.south)
-  -- (9.3,  -5.6)
-  -- (17.1, -5.6)
-  -- (17.1, -2.15)
-  -- ($(hps.west)+(0,-0.55)$);
-\node[lbl] at (12.7,-5.6) {seconds remaining};
+% ---- FSM <-> nav ROM (the category lookup): two clean vertical lanes ----
+\draw[navarr] (8.8, 0.7) -- (8.8, 3.05);
+\draw[navarr, fbk] (10.0, 3.05) -- (10.0, 0.7);
+
+% ---- in_default gates the sleep timer ----
+\draw[slparr] (nav.east) -- node[lbl,above]{in\_default} (slp.west);
+
+% ---- sleep timeout returns into the FSM's east face, clear of the
+%      lookup lanes above it ----
+\draw[slparr, fbk] (slp.south) -- (14.2, 1.9) -- (12.4, 1.9) -- (12.4, 0.4)
+              -- ([yshift=4mm]fsm.east);
+\node[lbl] at (13.3, 2.15) {sleep timeout};
+
+% ---- index down to the duration ROM ----
+\draw[arr] (10.4, -0.7) -- (dur.north);
+
+% ---- per-message timer loop: duration ROM feeds the timer left to right,
+%      the timeout returns to the FSM ----
+\draw[tarr] (dur.east) -- node[lbl,above]{duration} (tmr.west);
+\draw[tarr, fbk] (tmr.north) -- (14.2, -1.5) -- (11.4, -1.5) -- (11.4, -0.7);
+\node[lbl] at (12.8, -1.75) {msg timeout};
+% "any press" enters the timer on its bottom edge, so it does not fight the
+% duration arrow for the west face.
+\draw[tarr] (edg.south) -- (5.2, -4.8) -- (13.4, -4.8) -- (13.4, -4.15);
+\node[lbl, below] at (8.4, -4.8) {any press (reloads the timer)};
+
+% ---- index also drives the HEX digits ----
+\node[jdot] at (16.1, 0) {};
+\draw[arr] (16.1, 0) -- (16.1, -1.9) -- (17.8, -1.9) -- (hex.north);
+
+% ---- state + index over to the PIO bank ----
+% The lane rides just above the blocks instead of arcing to the top of the
+% picture: the old route left a full-width empty band across the top and made
+% the whole diagram read as sprawling. It hops over the sleep-timeout return
+% with a bridge, which is the standard drafting convention for the one
+% unavoidable crossing here.
+\draw[darr, -] (11.4, 0.7) -- (11.4, 2.6) -- (13.95, 2.6);
+\draw[darr, -] (13.95, 2.6) arc (180:0:0.25);
+\draw[darr] (14.45, 2.6) -- (25.8, 2.6) -- (pio.north);
+\node[lbl, above] at (20.2, 2.6) {state\,+\,index \ \scriptsize(\texttt{fsm\_status\_pio})};
+
+% ---- seconds remaining under the fabric to the PIO bank ----
+\draw[darr] (tmr.south) -- (14.2, -5.4) -- (24.7, -5.4) -- (24.7, -2.2);
+\node[lbl, below] at (19.4, -5.4) {seconds remaining + timeout \ \scriptsize(\texttt{timer\_status\_pio})};
+\node[jdotb] at (17.8, -5.4) {};
+\draw[tarr] (17.8, -5.4) -- node[lbl,right]{seconds} (hex.south);
+
+% ---- legend, drawn as a node in the SAME coordinate system as the picture
+%      above (rather than as ordinary paragraph text after \end{tikzpicture})
+%      so it is reliably centered under the diagram regardless of the
+%      surrounding document's text width.
+\node[align=center, font=\footnotesize, text width=27cm] at (14.4, -7.2) {%
+\arrkey{draw=black!80, line width=1.6pt}{forward datapath}\hspace{0.55cm}%
+\arrkey{draw=MsgBorder, line width=1.1pt}{navigation and message text}\hspace{0.55cm}%
+\arrkey{draw=red!80!black, line width=1.2pt}{per-message timer}\\[3pt]
+\arrkey{draw=SleepBorder, line width=1.1pt}{sleep path}\hspace{0.55cm}%
+\arrkey{draw=blue!70!black, line width=1.1pt}{read by the HPS}\hspace{0.55cm}%
+\arrkey{draw=black!70, line width=1.1pt, dash pattern=on 2.4pt off 1.7pt}{dashed: returns to the FSM}\\[3pt]
+\stg{1}\,--\,\stg{5}~pipeline stage, numbered as in the book text and in
+\texttt{\small fpga\_msg\_controller.v}%
+};
 
 \end{tikzpicture}
+
 \end{document}
