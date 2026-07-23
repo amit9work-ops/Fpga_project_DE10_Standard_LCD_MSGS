@@ -59,8 +59,10 @@
 \node[msgstate]  (MSG)   at (5.2, 0.0)  {MSG};
 \node[sleepstate](SLEEP) at (11.0, 0.0) {SLEEP};
 
-\draw[timeoutarr] ([xshift=-1.35cm]INIT.west) --
-  node[lbl, above, text=TimeoutRed] {reset} (INIT.west);
+% reset is an automatic startup transition, not a timer expiry, so it is drawn
+% gray to match the legend (gray = automatic startup), like 'auto'.
+\draw[autoarr] ([xshift=-1.35cm]INIT.west) --
+  node[lbl, above, text=ArrowGray] {reset} (INIT.west);
 \draw[autoarr] (INIT.east) --
   node[lbl, above, text=ArrowGray] {auto} (MSG.west);
 

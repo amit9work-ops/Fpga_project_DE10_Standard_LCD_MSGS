@@ -48,8 +48,10 @@ The FPGA owns the real-time path (debounce → edge detect → FSM → timer) an
 ## Register Map & FSM
 
 <p align="center">
-  <img src="assets/images/03_register_bitfield_layout.png" alt="Bit-field layout of fsm_status_pio, timer_status_pio, and the wide message-text registers" width="480">
-  <img src="assets/images/02_fsm_state_diagram.png" alt="3-state Moore FSM: INIT, MSG, SLEEP, with category-jump and sequential-timeout navigation" width="620">
+  <img src="assets/images/03_register_bitfield_layout.png" alt="Bit-field layout of fsm_status_pio, timer_status_pio, and the wide message-text registers" width="820">
+</p>
+<p align="center">
+  <img src="assets/images/02_fsm_state_diagram.png" alt="3-state Moore FSM: INIT, MSG, SLEEP, with category-jump and sequential-timeout navigation" width="560">
 </p>
 
 | PIO | Offset | Fields |

@@ -42,8 +42,9 @@
   \node[blk, draw=FpgaOrange, fill=FpgaLight] (fpga) {
     \textbf{\textcolor{FpgaOrange}{FPGA Fabric}}\\[5pt]
     \footnotesize KEY[0--3] inputs\\
-    \footnotesize debounce, FSM, timer\\[2pt]
-    \footnotesize read-only PIO status
+    \footnotesize debounce, FSM, two timers\\
+    \footnotesize message text ROM\\[2pt]
+    \footnotesize read-only PIO status + text
   };
   \node[bridge, right=1.35cm of fpga] (bridge) {
     Lightweight\\HPS-to-FPGA\\Bridge\\[-1pt]

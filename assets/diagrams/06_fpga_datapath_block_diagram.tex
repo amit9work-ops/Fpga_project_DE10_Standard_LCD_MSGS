@@ -50,6 +50,12 @@
 % system-idle "sleep" timer, enabled only while msg_nav_rom reports
 % in_default). The single "Countdown Timer" of round 1 is relabelled
 % "Per-Message Timer" to disambiguate it from the sleep timer.
+%
+% RESYNC (readability pass): the layout was decluttered to match the book's
+% updated Figure 4.1 -- regions I/II/III are now tiled left to right with no
+% overlapping dashed boxes, the two full-width "any press" arcs are replaced by
+% one tap that feeds both timers on short branches, and the HEX feeds are on
+% clean non-crossing lanes.
 \begin{tikzpicture}[
   every node/.style={font=\small\sffamily},
   % Block text is deliberately set at \large: in the book the whole picture is
@@ -135,39 +141,40 @@
 
 % ===== Region I: input conditioning (left) =====
 \node[ext, minimum width=2.6cm] (keys) at (0.0,  0) {\shortstack{KEY[3:0]\\board pins}};
-\node[pip, minimum width=3.0cm] (deb)  at (4.4,  0) {\shortstack{Debouncer\\20\,ms}};
-\node[pip, minimum width=3.0cm] (edg)  at (8.8,  0) {\shortstack{Edge\\Detector}};
+\node[pip, minimum width=3.0cm] (deb)  at (4.2,  0) {\shortstack{Debouncer\\20\,ms}};
+\node[pip, minimum width=3.0cm] (edg)  at (8.0,  0) {\shortstack{Edge\\Detector}};
 
 % ===== Region II: navigation, control and timing (middle) =====
-% The FSM is the hub: four lanes leave/enter its top face and two its bottom,
-% so it is drawn wider and taller than every other block.
-\node[pip, minimum width=3.8cm, minimum height=1.7cm] (fsm) at (13.8, 0)
+% The FSM is the hub. Its ROMs sit directly beside it (nav above-left, duration
+% below-left) and the two timers just outside them, so region II stays a
+% compact column that ends well before region III begins.
+\node[pip, minimum width=3.8cm, minimum height=1.7cm] (fsm) at (13.4, 0)
   {\shortstack{Message\\FSM}};
-\node[romsty, minimum width=3.3cm] (nav) at (12.5,  4.3)
+\node[romsty, minimum width=3.3cm] (nav) at (12.2,  4.4)
   {\shortstack{Msg Nav ROM\\\normalsize category table}};
-\node[slp, minimum width=2.9cm] (slp) at (18.4,  4.3) {\shortstack{Sleep\\Timer}};
-\node[romsty, minimum width=3.3cm] (dur) at (12.5, -4.3)
+\node[slp, minimum width=2.9cm] (slp) at (18.0,  4.4) {\shortstack{Sleep\\Timer}};
+\node[romsty, minimum width=3.3cm] (dur) at (12.2, -4.4)
   {\shortstack{Msg Duration\\ROM}};
-\node[tim, minimum width=3.3cm] (tmr) at (18.4, -4.3)
+\node[tim, minimum width=3.3cm] (tmr) at (18.0, -4.4)
   {\shortstack{Per-Message\\Timer}};
 
-% ===== Region III: message text path (right) =====
-\node[romsty, minimum width=3.0cm] (trom) at (19.0, 0) {\shortstack{Msg Text\\ROM}};
-\node[romsty, minimum width=3.3cm] (texp) at (23.6, 0)
+% ===== Region III: message text path (right, clearly separated from II) =====
+\node[romsty, minimum width=3.0cm] (trom) at (23.0, 0) {\shortstack{Msg Text\\ROM}};
+\node[romsty, minimum width=3.3cm] (texp) at (27.6, 0)
   {\shortstack{Text Export\\\normalsize + seqlock}};
 
 % ===== Board display output (sits under the text path, fed by index + seconds)
-\node[ext, minimum width=3.0cm] (hex) at (23.6, -4.3)
+\node[ext, minimum width=3.0cm] (hex) at (23.0, -4.4)
   {\shortstack{HEX5:HEX0\\\normalsize board 7-seg}};
 
 % ===== PIO register bank + HPS =====
-\node[piobank] (pio) at (28.6, 0)
+\node[piobank] (pio) at (32.4, 0)
   {\shortstack{PIO\\Register\\Bank\\[3pt]\normalsize read-only}};
-\node[hps] (hps) at (32.8, 0) {\shortstack{HPS\\ARM Linux\\LCD app}};
+\node[hps] (hps) at (36.6, 0) {\shortstack{HPS\\ARM Linux\\LCD app}};
 
 % ---- lookup labels sit beside their lanes, between the FSM and the nav ROM.
-\node[lbl, anchor=east] (navlbla) at (12.05, 2.5) {\shortstack[r]{index\\+ action}};
-\node[lbl, anchor=west] (navlblb) at (14.05, 2.5) {\shortstack[l]{next\\index}};
+\node[lbl, anchor=east] (navlbla) at (12.2, 2.3) {\shortstack[r]{index\\+ action}};
+\node[lbl, anchor=west] (navlblb) at (13.7, 2.3) {\shortstack[l]{next\\index}};
 
 % ---- step badges, set OUTSIDE the top-left corner so they never sit on top
 %      of the (now larger) block text. Numbers match the stage comments in
@@ -185,15 +192,18 @@
 \begin{scope}[on background layer]
   \node[grp, fit=(keys)(deb)(edg),
         label={[grplbl]above:\textbf{I} \ Input conditioning}] {};
-  \node[grp, fit=(nav)(slp)(fsm)(dur)(tmr)(navlbla)(navlblb),
+  % The two (10.9,+/-5.6) points pull the region-II box tall enough to enclose
+  % the "any press" reload lanes, so the reload routing lives inside region II
+  % instead of arcing outside every box the way the old drawing did.
+  \node[grp, fit={(nav)(slp)(fsm)(dur)(tmr)(navlbla)(navlblb)(10.9,5.6)(10.9,-5.6)},
         label={[grplbl]above:\textbf{II} \ Navigation, control and timing}] {};
   \node[grp, fit=(trom)(texp),
         label={[grplbl]above:\textbf{III} \ Message text path}] {};
 \end{scope}
 
 % ---- fabric / HPS boundary (between the PIO bank and the HPS) ----
-\draw[dashed, draw=blue!70!black, line width=1.0pt] (30.7, -6.1) -- (30.7, 5.4);
-\node[bridgebox] at (30.7, 4.2) {\shortstack{Lightweight\\HPS--FPGA\\Bridge}};
+\draw[dashed, draw=blue!70!black, line width=1.0pt] (34.5, -7.4) -- (34.5, 5.6);
+\node[bridgebox] at (34.5, 4.4) {\shortstack{Lightweight\\HPS--FPGA\\Bridge}};
 
 % ---- main left-to-right spine: one unbroken line, left edge to right edge ----
 \draw[spine] (keys.east) -- node[lbl,above]{raw}    (deb.west);
@@ -205,48 +215,62 @@
 \draw[darr] (pio.east) -- node[lbl,above]{reads} (hps.west);
 
 % ---- FSM <-> nav ROM (category lookup): two clean vertical lanes ----
-\draw[navarr]      (12.6, 0.85) -- (12.6, 3.675);
-\draw[navarr, fbk] (14.0, 3.675) -- (14.0, 0.85);
+\draw[navarr]      (12.35, 0.85) -- (12.35, 3.775);
+\draw[navarr, fbk] (13.55, 3.775) -- (13.55, 0.85);
 
 % ---- in_default gates the sleep timer ----
 \draw[slparr] (nav.east) -- node[lbl,above]{in\_default} (slp.west);
 
+% ---- any button press reloads BOTH timers. One tap on the pulse line just
+%      before the FSM feeds two short branches -- up to the sleep timer here,
+%      down to the per-message timer below. Both stay inside the region-II box
+%      (its fit is stretched to enclose them), so nothing wraps the drawing.
+% Tap sits at x=10.2, just LEFT of the ROM left edge (10.55), so the vertical
+% branch runs clear of the Msg Nav ROM and Msg Duration ROM boxes.
+\node[jdot] at (10.2, 0) {};
+\node[lbl, rotate=90] at (10.2, 2.4) {any press};
+\draw[slparr] (10.2, 0) -- (10.2, 5.6) -- (18.0, 5.6) -- (slp.north);
+
 % ---- sleep timeout returns to the FSM top face on its own lane ----
-\draw[slparr, fbk] (slp.south) -- (18.4, 2.2) -- (14.8, 2.2) -- (14.8, 0.85);
-\node[lbl] at (16.6, 2.45) {sleep timeout};
+\draw[slparr, fbk] (slp.south) -- (18.0, 2.2) -- (14.6, 2.2) -- (14.6, 0.85);
+\node[lbl] at (16.4, 2.2) {sleep timeout};
 
 % ---- index down to the duration ROM ----
-\draw[arr] (12.5, -0.85) -- (dur.north);
+\draw[arr] (12.2, -0.85) -- (dur.north);
 
 % ---- per-message timer loop: duration ROM -> timer -> back to the FSM ----
 \draw[tarr] (dur.east) -- node[lbl,above]{duration} (tmr.west);
-\draw[tarr, fbk] (tmr.north) -- (18.4, -2.2) -- (15.0, -2.2) -- (15.0, -0.85);
-\node[lbl] at (16.6, -2.45) {msg timeout};
-% "any press" enters the timer on its south-west corner, clear of the duration
-% arrow on the west face.
-\draw[tarr] (edg.south) -- (8.8, -6.0) -- (17.8, -6.0) -- (17.8, -4.925);
-\node[lbl, below] at (12.5, -6.0) {any press (reloads the timer)};
+\draw[tarr, fbk] (tmr.north) -- (18.0, -2.2) -- (14.6, -2.2) -- (14.6, -0.85);
+\node[lbl] at (16.4, -2.2) {msg timeout};
+% down branch of the same "any press" tap: reload the per-message timer, then
+% carry the identical edge-detector pulse on to HEX2 (last button pressed),
+% so one signal serves both instead of a second full-width arc.
+\draw[tarr] (10.2, 0) -- (10.2, -5.6) -- (17.5, -5.6) -- (17.5, -5.025);
+\node[jdot] at (17.5, -5.6) {};
+\draw[tarr] (17.5, -5.6) -- (22.0, -5.6) -- (22.0, -5.025);
+\node[lbl, below] at (19.9, -5.6) {last button};
 
-% ---- index also drives the HEX digits (message number on the 7-seg) ----
-\node[jdot] at (16.4, 0) {};
-\draw[arr] (16.4, 0) -- (16.4, -1.5) -- node[lbl,above,pos=0.85]{index} (23.6, -1.5) -- (hex.north);
+% ---- index also drives the HEX digits (message number on the 7-seg), tapped
+%      from the spine in the clear gap between regions II and III ----
+\node[jdot] at (20.3, 0) {};
+\draw[arr] (20.3, 0) -- (20.3, -1.6) -- node[lbl,above,pos=0.8]{index} (23.0, -1.6) -- (hex.north);
 
 % ---- state + index up to the PIO bank, on a clear lane that rides above the
 %      region-III header so the two never touch ----
-\draw[darr] (15.4, 0.85) -- (15.4, 2.05) -- ($(pio.west)+(0,2.05)$);
-\node[lbl, above] at (24.6, 2.05) {state\,+\,index \ \scriptsize(\texttt{fsm\_status\_pio})};
+\draw[darr] (15.2, 0.85) -- (15.2, 2.05) -- ($(pio.west)+(0,2.05)$);
+\node[lbl, above] at (28.5, 2.05) {state + index};
 
 % ---- seconds remaining under the fabric to the PIO bank ----
-\draw[darr] ([xshift=6mm]tmr.south) -- (19.0, -5.4) -- (28.6, -5.4) -- (pio.south);
-\node[lbl, below] at (24.0, -5.4) {seconds remaining + timeout \ \scriptsize(\texttt{timer\_status\_pio})};
-\node[jdotb] at (23.6, -5.4) {};
-\draw[darr] (23.6, -5.4) -- node[lbl,right]{seconds} (hex.south);
+\draw[darr] ([xshift=6mm]tmr.south) -- (18.6, -6.8) -- (32.4, -6.8) -- (pio.south);
+\node[lbl, below] at (27.4, -6.8) {seconds + timeout};
+\node[jdotb] at (23.0, -6.8) {};
+\draw[darr] (23.0, -6.8) -- node[lbl,right]{seconds} (hex.south);
 
 % ---- legend, drawn as a node in the SAME coordinate system as the picture
 %      above (rather than as ordinary paragraph text after \end{tikzpicture})
 %      so it is reliably centered under the diagram regardless of the
 %      surrounding document's text width.
-\node[align=center, font=\footnotesize, text width=27cm] at (14.4, -7.2) {%
+\node[align=center, font=\footnotesize, text width=27cm] at (16.5, -8.6) {%
 \arrkey{draw=black!80, line width=1.6pt}{forward datapath}\hspace{0.55cm}%
 \arrkey{draw=MsgBorder, line width=1.1pt}{navigation and message text}\hspace{0.55cm}%
 \arrkey{draw=red!80!black, line width=1.2pt}{per-message timer}\\[3pt]

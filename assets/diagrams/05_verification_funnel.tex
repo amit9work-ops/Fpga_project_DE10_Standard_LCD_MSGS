@@ -35,14 +35,19 @@
                font=\scriptsize\bfseries, text=N2},
   lbl/.style={font=\scriptsize, align=left, anchor=west},
 ]
-\def\gatewidth{9.5}
+% Widths decrease strictly top-to-bottom so the boxes read as a narrowing
+% funnel. Labels are kept short enough that none exceeds its box width (a long
+% label auto-expands its node and would break the monotonic narrowing); the
+% full defect each gate caught is spelled out in the caught: annotation beside
+% it, so nothing is lost.
+\def\gatewidth{9.0}
 \foreach \i/\y/\w/\clr/\gate/\defect in {
-  0/0.0/9.5/FpgaOrange/Board-wiring review/LCD assumed on FPGA,
-  1/-2.0/8.0/IntelBlue/Verilator lint/Bit-width mismatch,
-  2/-4.0/6.5/HpsGreen/Unit testbenches (edge-case test)/Missed press at timeout edge,
-  3/-6.0/5.0/MsgBorder/RTL integration TB/Register mismatch (FPGA--HPS),
-  4/-8.0/3.5/TimeoutRed/Quartus timing \& fitter/Failed timing after synthesis,
-  5/-10.0/2.0/SleepBorder/Hardware bring-up \& scope/Stale text on LCD
+  0/0.0/9.0/FpgaOrange/Board-wiring review/LCD assumed on FPGA,
+  1/-2.0/7.4/IntelBlue/Verilator lint/Bit-width mismatch,
+  2/-4.0/5.8/HpsGreen/Unit testbenches/Missed press at timeout edge,
+  3/-6.0/4.6/MsgBorder/RTL integration TB/Register mismatch (FPGA--HPS),
+  4/-8.0/3.8/TimeoutRed/Quartus timing/Failed timing after synthesis,
+  5/-10.0/3.0/SleepBorder/Bring-up \& scope/Stale text on LCD
 } {
   \node[gate, minimum width=\w cm, minimum height=1.5cm,
         fill=\clr, text=white] at (0,\y) {\gate};

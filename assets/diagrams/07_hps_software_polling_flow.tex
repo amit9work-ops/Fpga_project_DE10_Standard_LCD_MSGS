@@ -71,7 +71,8 @@
   {Startup: \texttt{mmap()} bridge \& initialise LCD};
 
 \node[loop] (poll) at (0, -1.6)
-  {Read \texttt{fsm\_status\_pio} and \texttt{timer\_status\_pio} from FPGA};
+  {\shortstack{Read \texttt{fsm\_status\_pio} and \texttt{timer\_status\_pio};\\
+   read message text via seqlock (retry if torn)}};
 
 \node[cond] (chk)  at (0, -3.7)
   {State or index changed?};
@@ -83,7 +84,7 @@
   {Clear / blank LCD};
 
 \node[renderupd] (upd) at (2.75, -8.55)
-  {Fetch message string \& render to LCD};
+  {Assemble 4\,$\times$\,16 chars from the bridge words \& render to LCD};
 
 \node[loop] (slp)  at (0, -10.15)
   {\texttt{usleep(5\,ms)}};
